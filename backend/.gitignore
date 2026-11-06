@@ -1,0 +1,29 @@
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Binaries and build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+
+# Test artifacts and coverage
+*.out
+*.test
+*.prof
+tmp/
+
+# Secrets and certificates
+*.pem
+*.key
+*.crt
+credentials.json

@@ -1,0 +1,27 @@
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: inverfit-mongodb
+    restart: unless-stopped
+    ports:
+      # Exponer el puerto únicamente en localhost para seguridad
+      - "127.0.0.1:27017:27017"
+    environment:
+      # Credenciales tomadas de las variables de entorno locales (.env)
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGODB_DATABASE:-inverfit_dev}
+    volumes:
+      - inverfit-mongo-data:/data/db
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "mongosh --username $$MONGO_INITDB_ROOT_USERNAME --password $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval 'db.adminCommand(\"ping\")' || exit 1"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  inverfit-mongo-data:
+    name: inverfit-mongo-data
