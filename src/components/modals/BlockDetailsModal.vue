@@ -16,6 +16,10 @@ const emit = defineEmits<{
   (e: 'close'): void
   (e: 'add-student', block: ScheduleBlock): void
   (e: 'edit-block', block: ScheduleBlock): void
+  (e: 'deleted', blockId: string): void
+  (e: 'cancelled', occurrence: SessionOccurrence): void
+  (e: 'restored'): void
+  (e: 'updated'): void
 }>()
 
 const router = useRouter()
@@ -29,7 +33,7 @@ const currentBlock = computed<ScheduleBlock | null>(() => {
 
 const assignedStudents = computed(() => {
   if (!currentBlock.value) return []
-  return gymStore.students.filter(s => currentBlock.value!.studentIds.includes(s.id))
+  return gymStore.students.filter(s => (currentBlock.value!.studentIds || []).includes(s.id))
 })
 
 // Exception / reschedule state
@@ -83,6 +87,7 @@ async function handleSaveException() {
     })
 
     showReschedulePanel.value = false
+    emit('updated')
     emit('close')
   } catch (err: unknown) {
     exceptionError.value = err instanceof Error ? err.message : 'Error al reagendar excepción.'
@@ -95,12 +100,15 @@ async function handleCancelThisOccurrence() {
   if (!currentBlock.value || !props.occurrence) return
   if (confirm(`¿Cancelar la sesión sólo para esta semana (${props.occurrence.date})? El horario recurrente se mantendrá intacto para las demás semanas.`)) {
     try {
+      const occ = props.occurrence
       await gymStore.createException({
         blockId: currentBlock.value.id,
         date: props.occurrence.date,
         type: 'cancelled',
         notes: 'Cancelado para esta fecha específica.'
       })
+      emit('cancelled', occ)
+      emit('updated')
       emit('close')
     } catch (err: unknown) {
       gymStore.showToast(err instanceof Error ? err.message : 'Error al cancelar ocurrencia', 'error')
@@ -111,23 +119,40 @@ async function handleCancelThisOccurrence() {
 async function handleRestoreRecurring() {
   if (!props.occurrence?.exceptionId) return
   if (confirm('¿Restablecer esta sesión a su horario recurrente habitual?')) {
-    await gymStore.deleteException(props.occurrence.exceptionId)
-    emit('close')
+    try {
+      await gymStore.deleteException(props.occurrence.exceptionId, props.occurrence.blockId)
+      emit('restored')
+      emit('updated')
+      emit('close')
+    } catch (err: unknown) {
+      gymStore.showToast(err instanceof Error ? err.message : 'Error al restaurar sesión habitual', 'error')
+    }
   }
 }
 
 async function handleRemoveStudent(studentId: string, studentName: string) {
   if (!currentBlock.value) return
   if (confirm(`¿Quitar a ${studentName} de esta sesión?`)) {
-    await gymStore.removeStudentFromSchedule(currentBlock.value.id, studentId)
+    try {
+      await gymStore.removeStudentFromSchedule(currentBlock.value.id, studentId)
+      emit('updated')
+    } catch {
+      // Toast gestionado en el store
+    }
   }
 }
 
 async function handleDeleteBlock() {
   if (!currentBlock.value) return
   if (confirm(`¿Eliminar definitivamente esta sesión recurrente de ${currentBlock.value.day} ${currentBlock.value.startTime}?`)) {
-    await gymStore.deleteBlock(currentBlock.value.id)
-    emit('close')
+    const id = currentBlock.value.id
+    try {
+      await gymStore.deleteBlock(id)
+      emit('deleted', id)
+      emit('close')
+    } catch {
+      // Si falla, el store muestra toast y el bloque NO se elimina falsamente de la vista
+    }
   }
 }
 

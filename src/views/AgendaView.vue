@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useGymStore } from '@/stores/gym'
 import {
   getWeekDates,
@@ -13,7 +13,8 @@ import {
   Users,
   Settings,
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  RefreshCw
 } from 'lucide-vue-next'
 import AssignScheduleModal from '@/components/modals/AssignScheduleModal.vue'
 import BlockDetailsModal from '@/components/modals/BlockDetailsModal.vue'
@@ -27,6 +28,8 @@ const selectedDay = ref<DayOfWeek>('Lun')
 const showAssignModal = ref(false)
 const showBlockModal = ref(false)
 const showAvailabilityModal = ref(false)
+const isRefreshing = ref(false)
+const weekError = ref<string | null>(null)
 
 const activeBlockId = ref<string | null>(null)
 const activeBlock = computed(() => {
@@ -38,6 +41,7 @@ const prefillBlockId = ref<string | undefined>(undefined)
 const prefillDay = ref<DayOfWeek>('Lun')
 const prefillTime = ref('08:00')
 const prefillEndTime = ref<string | undefined>(undefined)
+const prefillDate = ref<string | undefined>(undefined)
 
 // Week dates calculation
 const weekDays = computed<WeekDayInfo[]>(() => {
@@ -58,6 +62,36 @@ const weekOffsetLabel = computed(() => {
   return `Semana ${weekOffset.value}`
 })
 
+async function refreshAgenda() {
+  if (weekDays.value.length === 0) return
+  const from = weekDays.value[0].dateStr
+  const to = weekDays.value[6].dateStr
+  isRefreshing.value = true
+  weekError.value = null
+  try {
+    if (gymStore.isScheduleApiMode()) {
+      await Promise.all([
+        gymStore.fetchWeekOccurrences(from, to),
+        gymStore.loadSchedule(from, to)
+      ])
+    } else {
+      await gymStore.loadSchedule(from, to)
+    }
+  } catch (err: unknown) {
+    weekError.value = err instanceof Error ? err.message : 'Error al cargar la agenda semanal'
+  } finally {
+    isRefreshing.value = false
+  }
+}
+
+onMounted(() => {
+  refreshAgenda()
+})
+
+watch(weekOffset, () => {
+  refreshAgenda()
+})
+
 // Calculate occurrences for the current week taking exceptions into account
 const weekOccurrences = computed<SessionOccurrence[]>(() => {
   return gymStore.getWeekOccurrences(weekDays.value)
@@ -71,7 +105,12 @@ function getOccurrencesForDay(day: DayOfWeek): SessionOccurrence[] {
 // Availability for a day
 function getAvailabilityForDay(day: DayOfWeek) {
   const found = gymStore.availability.find(a => a.day === day)
-  if (found) return found
+  if (found) {
+    return {
+      ...found,
+      intervals: Array.isArray(found.intervals) ? found.intervals : []
+    }
+  }
   return { day, enabled: false, intervals: [] }
 }
 
@@ -106,11 +145,12 @@ function selectDay(day: DayOfWeek) {
 }
 
 // Modal open handlers
-function openNewSessionModal(day?: DayOfWeek, time?: string) {
+function openNewSessionModal(day?: DayOfWeek, time?: string, dateStr?: string) {
   prefillBlockId.value = undefined
   prefillEndTime.value = undefined
   prefillDay.value = day || selectedDay.value
   prefillTime.value = time || '08:00'
+  prefillDate.value = dateStr || weekDays.value.find(w => w.day === (day || selectedDay.value))?.dateStr
   showAssignModal.value = true
 }
 
@@ -144,7 +184,7 @@ function getStudentNames(studentIds: string[]): string {
 
 // Computed hours summary for contextual panel
 const dayTotalAvailableHours = computed(() => {
-  const intervals = selectedDayAvailability.value.intervals
+  const intervals = selectedDayAvailability.value.intervals || []
   if (!selectedDayAvailability.value.enabled || intervals.length === 0) return 0
   const totalM = intervals.reduce((acc, i) => acc + (timeToMinutes(i.endTime) - timeToMinutes(i.startTime)), 0)
   return (totalM / 60).toFixed(1)
@@ -161,13 +201,33 @@ const dayScheduledHours = computed(() => {
     <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
-        <h1 class="text-[26px] font-bold text-[#191A1D] tracking-tight">Agenda Semanal</h1>
+        <div class="flex items-center gap-3">
+          <h1 class="text-[26px] font-bold text-[#191A1D] tracking-tight">Agenda Semanal</h1>
+          <span
+            class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase"
+            :class="gymStore.scheduleDataSource === 'api' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-800 border border-amber-200'"
+          >
+            <span class="w-1.5 h-1.5 rounded-full" :class="gymStore.scheduleDataSource === 'api' ? 'bg-emerald-500' : 'bg-amber-500'"></span>
+            Fuente: {{ gymStore.scheduleDataSource === 'api' ? 'API Go + MongoDB' : 'Demostración local (Mock)' }}
+          </span>
+        </div>
         <p class="text-[14px] text-[#6B6D74] mt-0.5">
           Gestión flexible de sesiones y configuración manual de disponibilidad por día.
         </p>
       </div>
 
       <div class="flex flex-wrap items-center gap-3">
+        <!-- Button: Refresh -->
+        <button
+          @click="refreshAgenda"
+          :disabled="isRefreshing"
+          class="h-[40px] px-3.5 bg-white border border-[#DCD8CF] hover:bg-[#FAF9F6] text-[#191A1D] rounded-[6px] text-[13px] font-semibold transition-all flex items-center gap-2 cursor-pointer shadow-2xs disabled:opacity-50"
+          title="Recargar agenda semanal"
+        >
+          <RefreshCw class="w-4 h-4 text-[#8C6B1B]" :class="{ 'animate-spin': isRefreshing }" />
+          <span class="hidden sm:inline">Recargar</span>
+        </button>
+
         <!-- Button: Configure Availability -->
         <button
           @click="openConfigureAvailability()"
@@ -179,13 +239,30 @@ const dayScheduledHours = computed(() => {
 
         <!-- Button: Program Session -->
         <button
-          @click="openNewSessionModal()"
+          @click="openNewSessionModal(selectedDay, undefined, selectedDayInfo.dateStr)"
           class="h-[40px] px-5 bg-[#CEA549] hover:bg-[#BA923B] text-[#0B0B0D] rounded-[6px] text-[14px] font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs hover:shadow"
         >
           <Plus class="w-4 h-4" />
           + Programar sesión
         </button>
       </div>
+    </div>
+
+    <!-- Error Alert Banner -->
+    <div
+      v-if="weekError"
+      class="p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-lg text-sm flex items-center justify-between"
+    >
+      <div class="flex items-center gap-2">
+        <AlertCircle class="w-5 h-5 flex-shrink-0 text-rose-600" />
+        <span>{{ weekError }}</span>
+      </div>
+      <button
+        @click="refreshAgenda"
+        class="px-3 py-1 bg-white border border-rose-300 text-rose-700 hover:bg-rose-100 rounded text-xs font-bold cursor-pointer transition-colors"
+      >
+        Reintentar conexión
+      </button>
     </div>
 
     <!-- Toolbar: Week Switcher & Legend -->
@@ -301,10 +378,10 @@ const dayScheduledHours = computed(() => {
               <!-- Day availability summary -->
               <div class="pt-1 text-[10px] leading-tight truncate">
                 <span
-                  v-if="getAvailabilityForDay(dayInfo.day).enabled && getAvailabilityForDay(dayInfo.day).intervals.length > 0"
+                  v-if="getAvailabilityForDay(dayInfo.day).enabled && (getAvailabilityForDay(dayInfo.day).intervals || []).length > 0"
                   :class="selectedDay === dayInfo.day ? 'text-[#CEA549]' : 'text-[#137333] font-semibold'"
                 >
-                  {{ getAvailabilityForDay(dayInfo.day).intervals.map(i => `${i.startTime}–${i.endTime}`).join(', ') }}
+                  {{ (getAvailabilityForDay(dayInfo.day).intervals || []).map(i => `${i.startTime}–${i.endTime}`).join(', ') }}
                 </span>
                 <span v-else class="text-[#8E9097] italic">
                   Sin disponibilidad
@@ -316,7 +393,7 @@ const dayScheduledHours = computed(() => {
             <div class="p-2 flex-1 flex flex-col justify-between space-y-2">
               <!-- If Day is NOT enabled / No intervals -->
               <div
-                v-if="!getAvailabilityForDay(dayInfo.day).enabled || getAvailabilityForDay(dayInfo.day).intervals.length === 0"
+                v-if="!getAvailabilityForDay(dayInfo.day).enabled || (getAvailabilityForDay(dayInfo.day).intervals || []).length === 0"
                 class="flex-1 flex flex-col items-center justify-center p-3 text-center text-[11px] text-[#8E9097] border border-dashed border-[#ECE8E1] rounded bg-[#FAF9F6]/50"
               >
                 <span>No disponible</span>
@@ -340,7 +417,7 @@ const dayScheduledHours = computed(() => {
                   <div class="mt-2">
                     <button
                       type="button"
-                      @click.stop="openNewSessionModal(dayInfo.day)"
+                      @click.stop="openNewSessionModal(dayInfo.day, undefined, dayInfo.dateStr)"
                       class="px-2 py-1 bg-white border border-[#DCD8CF] hover:border-[#CEA549] text-[10px] font-bold text-[#191A1D] rounded transition-colors shadow-2xs"
                     >
                       + Sesión
@@ -389,7 +466,7 @@ const dayScheduledHours = computed(() => {
               <button
                 v-if="getAvailabilityForDay(dayInfo.day).enabled"
                 type="button"
-                @click.stop="openNewSessionModal(dayInfo.day)"
+                @click.stop="openNewSessionModal(dayInfo.day, undefined, dayInfo.dateStr)"
                 class="w-full py-1.5 border border-dashed border-[#DCD8CF] hover:border-[#CEA549] text-[11px] font-bold text-[#8E9097] hover:text-[#191A1D] rounded transition-colors flex items-center justify-center gap-1 cursor-pointer"
               >
                 <Plus class="w-3 h-3" />
@@ -542,8 +619,9 @@ const dayScheduledHours = computed(() => {
       :initial-day="prefillDay"
       :initial-time="prefillTime"
       :initial-end-time="prefillEndTime"
+      :initial-date="prefillDate"
       @close="showAssignModal = false"
-      @assigned="gymStore.reloadData"
+      @assigned="refreshAgenda"
     />
 
     <BlockDetailsModal
@@ -551,6 +629,10 @@ const dayScheduledHours = computed(() => {
       :block="activeBlock"
       :occurrence="activeOccurrence"
       @close="showBlockModal = false"
+      @deleted="refreshAgenda"
+      @cancelled="refreshAgenda"
+      @restored="refreshAgenda"
+      @updated="refreshAgenda"
       @add-student="handleAddStudentFromBlock"
     />
 
@@ -558,7 +640,7 @@ const dayScheduledHours = computed(() => {
       :open="showAvailabilityModal"
       :initial-day="selectedDay"
       @close="showAvailabilityModal = false"
-      @saved="gymStore.reloadData"
+      @saved="refreshAgenda"
     />
   </div>
 </template>

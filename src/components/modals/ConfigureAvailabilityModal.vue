@@ -33,7 +33,7 @@ function initDraft() {
       return {
         day,
         enabled: existing.enabled,
-        intervals: existing.intervals.map(i => ({ ...i }))
+        intervals: (existing.intervals || []).map(i => ({ ...i }))
       }
     }
     return {
@@ -108,7 +108,7 @@ function removeInterval(index: number) {
 }
 
 function copyToWeekdays() {
-  const sourceIntervals = currentDayAvail.value.intervals.map(i => ({
+  const sourceIntervals = (currentDayAvail.value.intervals || []).map(i => ({
     ...i,
     id: `int-copy-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`
   }))

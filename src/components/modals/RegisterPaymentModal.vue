@@ -53,7 +53,7 @@ async function handleSubmit() {
   try {
     await gymStore.registerPayment({
       studentId: selectedStudentId.value,
-      amount: amount.value,
+      amount: (typeof amount.value === 'number' && !isNaN(amount.value) && amount.value >= 0) ? amount.value : null,
       paymentMethod: paymentMethod.value,
       paymentDate: paymentDate.value,
       notes: notes.value.trim()

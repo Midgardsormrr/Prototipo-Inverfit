@@ -955,13 +955,15 @@ gantt
     section Fase 0
     Auditoría y Planificación              :done, f0, 2026-11-06, 1d
     section Fase 1
-    Setup Go, Gin, MongoDB y Auth          :f1, 2026-11-07, 3d
+    Setup Go, Gin, MongoDB y Auth          :done, f1, 2026-11-06, 1d
     section Fase 2
-    Módulo Alumnos y Membresías            :f2, after f1, 4d
+    Módulo Alumnos y Membresías            :done, f2, 2026-11-06, 1d
     section Fase 3
-    Módulo Agenda Semanal y Excepciones    :f3, after f2, 5d
+    Módulo Agenda Semanal y Excepciones    :done, f3, 2026-11-06, 1d
     section Fase 4
-    Módulos Pagos, Evaluaciones y Contratos:f4, after f3, 4d
+    Módulo Pagos y Membresías (Fase 4A)   :done, f4a, 2026-11-06, 1d
+    section Fase 4B
+    Evaluaciones y Contratos               :f4b, 2026-11-07, 3d
     section Fase 5
     Integración Frontend y Despliegue      :f5, after f4, 3d
 ```

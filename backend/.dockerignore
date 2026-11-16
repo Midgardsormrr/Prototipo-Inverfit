@@ -1,0 +1,39 @@
+# Environment files and secrets
+.env
+.env.*
+*.pem
+*.key
+*.crt
+credentials.json
+
+# Binaries and compiled outputs
+bin/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test artifacts and coverage
+*.out
+*.test
+*.prof
+tmp/
+
+# Logs
+logs/
+*.log
+
+# Git
+.git/
+.gitignore
+
+# Docker files
+Dockerfile
+compose*.yaml
+compose*.yml
+
+# IDE / Editor files
+.vscode/
+.idea/

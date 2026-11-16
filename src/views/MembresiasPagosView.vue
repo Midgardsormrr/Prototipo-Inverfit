@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGymStore } from '@/stores/gym'
 import { paymentService } from '@/services'
-import { Download, Send } from 'lucide-vue-next'
+import { Download, Send, RefreshCw, AlertCircle } from 'lucide-vue-next'
 import RegisterPaymentModal from '@/components/modals/RegisterPaymentModal.vue'
 import SimulatedActionModal from '@/components/modals/SimulatedActionModal.vue'
 import type { Payment } from '@/types'
@@ -19,6 +19,12 @@ const generatedLink = ref('')
 
 const searchName = ref('')
 const filterStatus = ref<string>('')
+
+onMounted(() => {
+  if (gymStore.isPaymentsApiMode()) {
+    gymStore.loadPayments()
+  }
+})
 
 const filteredPayments = computed(() => {
   return gymStore.payments.filter(p => {
@@ -54,17 +60,23 @@ function handleSendRemindersBatch() {
   showSimModal.value = true
 }
 
-function exportCSV() {
-  const csv = paymentService.exportToCSV()
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.setAttribute('href', url)
-  link.setAttribute('download', `inverfit_pagos_${new Date().toISOString().split('T')[0]}.csv`)
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  gymStore.showToast('Archivo CSV exportado exitosamente.', 'success')
+async function exportCSV() {
+  try {
+    const csv = await paymentService.exportToCSV()
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.setAttribute('href', url)
+    link.setAttribute('download', `inverfit_pagos_${new Date().toISOString().split('T')[0]}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    gymStore.showToast('Archivo CSV exportado exitosamente.', 'success')
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Error al exportar CSV'
+    gymStore.showToast(msg, 'error')
+  }
 }
 
 function goToStudent(studentId: string) {
@@ -77,15 +89,51 @@ function goToStudent(studentId: string) {
     <!-- Header matching wireframe 05 -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
-        <h1 class="text-[26px] font-bold text-[#191A1D] tracking-tight">Membresías y pagos</h1>
+        <div class="flex items-center gap-3">
+          <h1 class="text-[26px] font-bold text-[#191A1D] tracking-tight">Membresías y pagos</h1>
+          <span
+            class="px-2.5 py-0.5 rounded-full text-[11px] font-bold border tracking-wide"
+            :class="gymStore.paymentsDataSource === 'api' ? 'bg-[#E6F4EA] text-[#137333] border-[#137333]/30' : 'bg-[#F1EFEA] text-[#6B6D74] border-[#DCD8CF]'"
+          >
+            {{ gymStore.paymentsDataSource === 'api' ? 'API REST (Go)' : 'Mock (localStorage)' }}
+          </span>
+        </div>
         <p class="text-[14px] text-[#6B6D74] mt-0.5">Controla vencimientos, estados y enlaces de pago.</p>
       </div>
 
+      <div class="flex items-center gap-3 self-start sm:self-auto">
+        <button
+          @click="gymStore.loadPayments()"
+          class="h-[40px] px-3.5 bg-white border border-[#DCD8CF] hover:border-[#CEA549] rounded-[6px] text-[13px] font-bold text-[#191A1D] flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+          title="Recargar pagos"
+        >
+          <RefreshCw class="w-3.5 h-3.5" :class="{ 'animate-spin': gymStore.loadingPayments }" />
+          Recargar
+        </button>
+
+        <button
+          @click="showRegisterModal = true"
+          class="h-[40px] px-5 bg-[#CEA549] hover:bg-[#BA923B] text-[#0B0B0D] rounded-[6px] text-[14px] font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs hover:shadow"
+        >
+          + Registrar pago
+        </button>
+      </div>
+    </div>
+
+    <!-- Error Alert Banner -->
+    <div
+      v-if="gymStore.paymentsError"
+      class="p-4 bg-rose-50 border border-rose-200 rounded-[10px] flex items-center justify-between shadow-2xs"
+    >
+      <div class="flex items-center gap-2.5 text-rose-800 text-sm">
+        <AlertCircle class="w-5 h-5 shrink-0" />
+        <span>{{ gymStore.paymentsError }}</span>
+      </div>
       <button
-        @click="showRegisterModal = true"
-        class="h-[40px] px-5 bg-[#CEA549] hover:bg-[#BA923B] text-[#0B0B0D] rounded-[6px] text-[14px] font-bold transition-all flex items-center justify-center gap-1.5 self-start sm:self-auto cursor-pointer shadow-xs hover:shadow"
+        @click="gymStore.loadPayments()"
+        class="px-3 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-900 rounded-[6px] text-xs font-bold transition-colors cursor-pointer"
       >
-        + Registrar pago
+        Reintentar
       </button>
     </div>
 
@@ -203,13 +251,23 @@ function goToStudent(studentId: string) {
           </thead>
 
           <tbody class="divide-y divide-[#ECE8E1]">
-            <tr v-if="filteredPayments.length === 0">
+            <tr v-if="gymStore.loadingPayments">
+              <td colspan="6" class="py-12 text-center text-sm text-[#8E9097]">
+                <div class="flex items-center justify-center gap-2">
+                  <RefreshCw class="w-4 h-4 animate-spin text-[#CEA549]" />
+                  <span>Cargando registros de pagos...</span>
+                </div>
+              </td>
+            </tr>
+
+            <tr v-else-if="filteredPayments.length === 0">
               <td colspan="6" class="py-12 text-center text-sm text-[#8E9097]">
                 No se encontraron registros de pago.
               </td>
             </tr>
 
             <tr
+              v-else
               v-for="payment in filteredPayments"
               :key="payment.id"
               class="hover:bg-[#FAF9F6] transition-colors group cursor-pointer"
@@ -290,7 +348,7 @@ function goToStudent(studentId: string) {
       </div>
     </div>
 
-    <!-- Informational Notes matching wireframe 05: [x=260, y=690] and [x=260, y=718] -->
+    <!-- Informational Notes matching wireframe 05 -->
     <div class="bg-white rounded-[10px] border border-[#E2DFD8] p-6 shadow-2xs space-y-2">
       <p class="text-[13px] text-[#4A4C52]">
         <strong class="text-[#191A1D]">Medios mencionados por el cliente:</strong> Webpay, Servipag, crédito, débito y transferencia.

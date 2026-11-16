@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useGymStore } from '@/stores/gym'
-import { Send, Edit, AlertCircle } from 'lucide-vue-next'
+import { studentService } from '@/services/students'
+import { Send, Edit, AlertCircle, ArrowLeft, Loader2, RefreshCw } from 'lucide-vue-next'
 import SimulatedActionModal from '@/components/modals/SimulatedActionModal.vue'
 import RegisterPaymentModal from '@/components/modals/RegisterPaymentModal.vue'
 import CreateEvaluationModal from '@/components/modals/CreateEvaluationModal.vue'
-import type { FrequencyType, StudentStatus } from '@/types'
+import type { Student, FrequencyType, StudentStatus } from '@/types'
 
 const props = defineProps<{
   id: string
@@ -15,6 +16,13 @@ const gymStore = useGymStore()
 
 const currentTab = ref<'resumen' | 'datos' | 'pagos' | 'evaluaciones' | 'contrato'>('resumen')
 const isEditing = ref(false)
+const isSaving = ref(false)
+const saveError = ref<string | null>(null)
+
+// Direct student ref to ensure reliable fetch even if gymStore.students isn't initialized
+const localStudent = ref<Student | null>(null)
+const loadingStudent = ref(true)
+const loadError = ref<string | null>(null)
 
 // Modals
 const showLinkModal = ref(false)
@@ -22,9 +30,59 @@ const showPaymentModal = ref(false)
 const showEvalModal = ref(false)
 const generatedLink = ref('')
 
-const student = computed(() => {
-  const s = gymStore.students.find(item => item.id === props.id)
-  return s || gymStore.students[0] || null
+// Computed student looks first at localStudent, then falls back to gymStore.students
+const student = computed<Student | null>(() => {
+  if (localStudent.value && localStudent.value.id === props.id) {
+    return localStudent.value
+  }
+  const inStore = gymStore.students.find(item => item.id === props.id)
+  return inStore || null
+})
+
+// En modo API, la agenda es la fuente de verdad de los horarios asignados
+const studentAssignedSchedule = computed(() => {
+  if (!student.value) return 'Por definir'
+  const blocks = gymStore.schedule.filter(b => b.studentIds.includes(student.value!.id))
+  if (blocks.length > 0) {
+    const dayOrder = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+    return blocks
+      .slice()
+      .sort((a, b) => dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day))
+      .map(b => `${b.day} ${b.startTime}`)
+      .join(', ')
+  }
+  return student.value.fixedSchedule || 'Días y horas por confirmar'
+})
+
+async function fetchStudentData() {
+  loadingStudent.value = true
+  loadError.value = null
+  try {
+    const cached = gymStore.students.find(s => s.id === props.id)
+    if (cached) {
+      localStudent.value = cached
+    }
+    const fresh = await studentService.getById(props.id)
+    localStudent.value = fresh
+  } catch (err: unknown) {
+    if (!localStudent.value) {
+      const msg = err instanceof Error ? err.message : 'No se pudo cargar la información del alumno'
+      loadError.value = msg
+    }
+  } finally {
+    loadingStudent.value = false
+  }
+}
+
+onMounted(() => {
+  fetchStudentData()
+  if (gymStore.isPaymentsApiMode()) {
+    gymStore.loadPayments()
+  }
+})
+
+watch(() => props.id, () => {
+  fetchStudentData()
 })
 
 // Edit form model
@@ -79,21 +137,30 @@ const studentContract = computed(() => {
 
 async function handleSaveEdit() {
   if (!student.value) return
-  await gymStore.updateStudent(student.value.id, {
-    fullName: editForm.value.fullName,
-    planName: editForm.value.planName,
-    frequency: editForm.value.frequency,
-    membershipStatus: editForm.value.membershipStatus,
-    fixedSchedule: editForm.value.fixedSchedule,
-    membershipStartDate: editForm.value.membershipStartDate,
-    membershipDueDate: editForm.value.membershipDueDate,
-    phone: editForm.value.phone,
-    email: editForm.value.email,
-    emergencyContact: editForm.value.emergencyContact,
-    healthConditions: editForm.value.healthConditions,
-    notes: editForm.value.notes
-  })
-  isEditing.value = false
+  isSaving.value = true
+  saveError.value = null
+  try {
+    const updated = await gymStore.updateStudent(student.value.id, {
+      fullName: editForm.value.fullName,
+      planName: editForm.value.planName,
+      frequency: editForm.value.frequency,
+      membershipStatus: editForm.value.membershipStatus,
+      fixedSchedule: editForm.value.fixedSchedule,
+      membershipStartDate: editForm.value.membershipStartDate,
+      membershipDueDate: editForm.value.membershipDueDate,
+      phone: editForm.value.phone,
+      email: editForm.value.email,
+      emergencyContact: editForm.value.emergencyContact,
+      healthConditions: editForm.value.healthConditions,
+      notes: editForm.value.notes
+    })
+    localStudent.value = updated
+    isEditing.value = false
+  } catch (err: unknown) {
+    saveError.value = err instanceof Error ? err.message : 'Error al guardar los cambios'
+  } finally {
+    isSaving.value = false
+  }
 }
 
 async function handleSendPaymentLink() {
@@ -111,7 +178,45 @@ async function toggleContractStatus() {
 </script>
 
 <template>
-  <div v-if="student" class="space-y-6 max-w-[1100px] mx-auto pb-10">
+  <!-- Loading state -->
+  <div v-if="loadingStudent && !student" class="flex flex-col items-center justify-center py-24 text-[#6B6D74] space-y-3">
+    <Loader2 class="w-8 h-8 animate-spin text-[#CEA549]" />
+    <p class="text-sm font-medium">Cargando ficha del alumno...</p>
+  </div>
+
+  <!-- Error / Not found state -->
+  <div v-else-if="!student" class="max-w-[560px] mx-auto text-center py-16 px-6 bg-white rounded-xl border border-[#E2DFD8] shadow-2xs space-y-4 my-8">
+    <div class="w-14 h-14 mx-auto rounded-full bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600">
+      <AlertCircle class="w-7 h-7" />
+    </div>
+    <h2 class="text-xl font-bold text-[#191A1D]">Alumno no encontrado</h2>
+    <p class="text-sm text-[#6B6D74]">
+      {{ loadError || 'No se encontró ningún alumno con el identificador solicitado o fue archivado.' }}
+    </p>
+    <div class="pt-2 flex items-center justify-center gap-3">
+      <button
+        @click="fetchStudentData"
+        class="px-4 py-2 bg-white border border-[#DCD8CF] hover:bg-[#FAF9F6] text-[#191A1D] rounded-md text-sm font-semibold transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
+      >
+        <RefreshCw class="w-4 h-4 text-[#8C6B1B]" />
+        Reintentar
+      </button>
+      <router-link
+        to="/alumnos"
+        class="px-4 py-2 bg-[#CEA549] hover:bg-[#BA923B] text-[#0B0B0D] rounded-md text-sm font-bold transition-all flex items-center gap-1.5 shadow-xs"
+      >
+        <ArrowLeft class="w-4 h-4" />
+        Volver a Alumnos
+      </router-link>
+    </div>
+  </div>
+
+  <div v-else class="space-y-6 max-w-[1100px] mx-auto pb-10">
+    <!-- Save error alert if any -->
+    <div v-if="saveError" class="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-md text-sm flex items-center justify-between">
+      <span>{{ saveError }}</span>
+      <button @click="saveError = null" class="text-rose-600 hover:text-rose-900 font-bold ml-2 cursor-pointer">✕</button>
+    </div>
     <!-- Header matching wireframe 04 -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
@@ -155,7 +260,7 @@ async function toggleContractStatus() {
               {{ student.membershipStatus }}
             </span>
             <span class="text-[12px] text-[#8E9097]">
-              · Horario: {{ student.fixedSchedule }}
+              · Horario: {{ studentAssignedSchedule }}
             </span>
           </div>
         </div>
@@ -235,8 +340,8 @@ async function toggleContractStatus() {
           </div>
 
           <div class="py-2.5 flex items-center justify-between">
-            <span class="text-[12px] text-[#6B6D74]">Horario fijo</span>
-            <span class="text-[13px] text-[#191A1D] font-semibold">{{ student.fixedSchedule }}</span>
+            <span class="text-[12px] text-[#6B6D74]">Horario asignado</span>
+            <span class="text-[13px] text-[#191A1D] font-semibold">{{ studentAssignedSchedule }}</span>
           </div>
 
           <div class="py-2.5 flex items-center justify-between">
@@ -507,16 +612,19 @@ async function toggleContractStatus() {
         <div v-if="isEditing" class="pt-4 flex justify-end gap-3 border-t border-[#ECE8E1]">
           <button
             type="button"
+            :disabled="isSaving"
             @click="isEditing = false"
-            class="px-4 py-2 border border-[#DCD8CF] rounded-md text-sm text-[#6B6D74] hover:bg-[#FAF9F6] cursor-pointer"
+            class="px-4 py-2 border border-[#DCD8CF] rounded-md text-sm text-[#6B6D74] hover:bg-[#FAF9F6] cursor-pointer disabled:opacity-50"
           >
             Cancelar
           </button>
           <button
             type="submit"
-            class="px-5 py-2 bg-[#CEA549] text-[#0B0B0D] rounded-md text-sm font-bold hover:bg-[#BA923B] transition-colors cursor-pointer shadow-xs"
+            :disabled="isSaving"
+            class="px-5 py-2 bg-[#CEA549] text-[#0B0B0D] rounded-md text-sm font-bold hover:bg-[#BA923B] transition-colors cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
           >
-            Guardar cambios
+            <Loader2 v-if="isSaving" class="w-4 h-4 animate-spin" />
+            {{ isSaving ? 'Guardando...' : 'Guardar cambios' }}
           </button>
         </div>
       </form>
@@ -671,7 +779,7 @@ async function toggleContractStatus() {
 CONTRATO DE ADHESIÓN Y CONSENTIMIENTO DE ENTRENAMIENTO — INVERFIT
 Alumno: {{ student.fullName }}
 Plan: {{ student.planName }} ({{ student.frequency }})
-Horario fijo acordado: {{ student.fixedSchedule }}
+Horario acordado: {{ studentAssignedSchedule }}
 
 El alumno declara encontrarse en condiciones físicas para participar en sesiones de fuerza y acondicionamiento. Acepta que los cambios de horario dependen de la disponibilidad del coach dentro de la misma semana y que las inasistencias sin aviso previo no aplazan la mensualidad.
       </div>

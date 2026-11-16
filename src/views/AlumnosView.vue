@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGymStore } from '@/stores/gym'
-import { Trash2 } from 'lucide-vue-next'
+import { Trash2, RefreshCw, AlertCircle, Database, HardDrive } from 'lucide-vue-next'
 import RegisterStudentModal from '@/components/modals/RegisterStudentModal.vue'
 
 const router = useRouter()
@@ -12,6 +12,10 @@ const showRegisterModal = ref(false)
 const searchName = ref('')
 const selectedStatus = ref('')
 const selectedFrequency = ref('')
+
+onMounted(async () => {
+  await gymStore.loadStudents()
+})
 
 const filteredStudents = computed(() => {
   return gymStore.students.filter(student => {
@@ -40,7 +44,12 @@ function goToProfile(studentId: string) {
 }
 
 async function handleDelete(studentId: string, name: string) {
-  if (confirm(`¿Eliminar al alumno de demostración "${name}"? Esta acción removerá sus pagos, evaluaciones y asignaciones de bloques.`)) {
+  const isApi = gymStore.dataSource === 'api'
+  const msg = isApi
+    ? `¿Archivar al alumno "${name}"? El alumno será marcado como archivado en MongoDB y sus antecedentes se conservarán intactos.`
+    : `¿Eliminar al alumno de demostración "${name}"? Esta acción removerá sus pagos, evaluaciones y asignaciones de bloques en localStorage.`
+
+  if (confirm(msg)) {
     await gymStore.deleteStudent(studentId)
   }
 }
@@ -51,15 +60,66 @@ async function handleDelete(studentId: string, name: string) {
     <!-- Header matching wireframe 03 -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
-        <h1 class="text-[26px] font-bold text-[#191A1D] tracking-tight">Alumnos</h1>
+        <div class="flex items-center gap-2.5">
+          <h1 class="text-[26px] font-bold text-[#191A1D] tracking-tight">Alumnos</h1>
+          <span
+            v-if="gymStore.dataSource === 'api'"
+            class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200"
+            title="Conectado a la API Go y base de datos MongoDB"
+          >
+            <Database class="w-3 h-3 text-emerald-600" />
+            Modo API (MongoDB)
+          </span>
+          <span
+            v-else
+            class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200"
+            title="Operando con almacenamiento simulado en localStorage"
+          >
+            <HardDrive class="w-3 h-3 text-amber-600" />
+            Modo Mock (localStorage)
+          </span>
+        </div>
         <p class="text-[14px] text-[#6B6D74] mt-0.5">Consulta alumnos, planes y estado de sus membresías.</p>
       </div>
 
+      <div class="flex items-center gap-2 self-start sm:self-auto">
+        <button
+          @click="gymStore.loadStudents()"
+          title="Recargar lista de alumnos"
+          :disabled="gymStore.loadingStudents"
+          class="h-[40px] px-3 bg-white hover:bg-[#FAF9F6] border border-[#DCD8CF] text-[#4A4C52] rounded-[6px] text-[13px] font-medium transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+        >
+          <RefreshCw class="w-4 h-4" :class="{ 'animate-spin': gymStore.loadingStudents }" />
+          <span class="hidden sm:inline">Refrescar</span>
+        </button>
+
+        <button
+          @click="showRegisterModal = true"
+          class="h-[40px] px-5 bg-[#CEA549] hover:bg-[#BA923B] text-[#0B0B0D] rounded-[6px] text-[14px] font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs hover:shadow"
+        >
+          + Nuevo alumno
+        </button>
+      </div>
+    </div>
+
+    <!-- Error Alert if API failed -->
+    <div
+      v-if="gymStore.studentsError"
+      class="bg-rose-50 border border-rose-200 rounded-[10px] p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-rose-800 shadow-2xs animate-in fade-in duration-200"
+    >
+      <div class="flex items-start gap-3">
+        <AlertCircle class="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+        <div>
+          <p class="text-[14px] font-bold">No se pudieron cargar los alumnos desde el backend</p>
+          <p class="text-[12px] text-rose-700 mt-0.5">{{ gymStore.studentsError }}</p>
+        </div>
+      </div>
       <button
-        @click="showRegisterModal = true"
-        class="h-[40px] px-5 bg-[#CEA549] hover:bg-[#BA923B] text-[#0B0B0D] rounded-[6px] text-[14px] font-bold transition-all flex items-center justify-center gap-1.5 self-start sm:self-auto cursor-pointer shadow-xs hover:shadow"
+        @click="gymStore.loadStudents()"
+        class="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-[6px] text-[13px] font-semibold transition-colors flex items-center justify-center gap-1.5 shrink-0 cursor-pointer self-start sm:self-auto"
       >
-        + Nuevo alumno
+        <RefreshCw class="w-3.5 h-3.5" :class="{ 'animate-spin': gymStore.loadingStudents }" />
+        Reintentar conexión
       </button>
     </div>
 
@@ -133,12 +193,27 @@ async function handleDelete(studentId: string, name: string) {
           </thead>
 
           <tbody class="divide-y divide-[#ECE8E1]">
-            <tr v-if="filteredStudents.length === 0">
+            <!-- Loading State -->
+            <tr v-if="gymStore.loadingStudents && gymStore.students.length === 0">
               <td colspan="6" class="py-12 text-center text-sm text-[#8E9097]">
-                No se encontraron alumnos que coincidan con la búsqueda o filtro.
+                <div class="flex items-center justify-center gap-2">
+                  <RefreshCw class="w-4 h-4 animate-spin text-[#CEA549]" />
+                  <span>Cargando alumnos desde {{ gymStore.dataSource === 'api' ? 'MongoDB...' : 'localStorage...' }}</span>
+                </div>
               </td>
             </tr>
 
+            <!-- Empty State -->
+            <tr v-else-if="filteredStudents.length === 0 && !gymStore.studentsError">
+              <td colspan="6" class="py-12 text-center text-sm text-[#8E9097]">
+                <p class="font-medium text-[#4A4C52]">No se encontraron alumnos que coincidan con la búsqueda o filtro.</p>
+                <p v-if="gymStore.dataSource === 'api'" class="text-xs text-[#8E9097] mt-1">
+                  La colección en MongoDB está lista para recibir registros. Haz clic en "+ Nuevo alumno" para registrar el primero.
+                </p>
+              </td>
+            </tr>
+
+            <!-- Data Rows -->
             <tr
               v-for="student in filteredStudents"
               :key="student.id"
@@ -198,7 +273,7 @@ async function handleDelete(studentId: string, name: string) {
                   </button>
                   <button
                     @click="handleDelete(student.id, student.fullName)"
-                    title="Eliminar de demostración"
+                    :title="gymStore.dataSource === 'api' ? 'Archivar alumno' : 'Eliminar de demostración'"
                     class="p-1 text-[#8E9097] hover:text-rose-600 transition-colors cursor-pointer"
                   >
                     <Trash2 class="w-4 h-4" />
@@ -218,7 +293,9 @@ async function handleDelete(studentId: string, name: string) {
         Desde el perfil se podrán consultar datos, horario fijo, pagos, evaluaciones y contrato.
       </p>
       <p class="text-[12px] text-[#8E9097] mt-3">
-        Datos de ejemplo. No utilizar información real de alumnos en el prototipo.
+        {{ gymStore.dataSource === 'api'
+          ? 'Conectado a la base de datos real MongoDB mediante la API Go REST.'
+          : 'Datos de ejemplo en modo demostración. No utilizar información real de alumnos en el prototipo.' }}
       </p>
     </div>
 

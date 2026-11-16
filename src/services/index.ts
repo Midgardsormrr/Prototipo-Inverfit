@@ -1,5 +1,6 @@
 export * from './storage'
 export * from './mockData'
+export * from './api/httpClient'
 export * from './students'
 export * from './payments'
 export * from './schedule'

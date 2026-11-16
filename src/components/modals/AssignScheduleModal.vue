@@ -12,6 +12,7 @@ const props = defineProps<{
   initialEndTime?: string
   initialStudentId?: string
   blockId?: string // If adding/editing an existing block
+  initialDate?: string
 }>()
 
 const emit = defineEmits<{
@@ -97,10 +98,10 @@ const validationCheck = computed(() => {
 // Availability info for the selected day
 const dayAvailabilityInfo = computed(() => {
   const avail = gymStore.availability.find(a => a.day === selectedDay.value)
-  if (!avail || !avail.enabled || avail.intervals.length === 0) {
+  if (!avail || !avail.enabled || !avail.intervals || avail.intervals.length === 0) {
     return 'Sin disponibilidad configurada para este día'
   }
-  return avail.intervals.map(i => `${i.startTime} a ${i.endTime}`).join(' y ')
+  return (avail.intervals || []).map(i => `${i.startTime} a ${i.endTime}`).join(' y ')
 })
 
 function toggleStudent(studentId: string) {
@@ -136,6 +137,7 @@ async function handleAssign() {
       startTime: startTime.value,
       endTime: endTime.value,
       isRecurring: isRecurring.value,
+      startDate: props.initialDate,
       notes: notes.value.trim()
     })
 

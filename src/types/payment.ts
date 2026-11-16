@@ -29,3 +29,19 @@ export interface RegisterPaymentDTO {
   paymentMethod: PaymentMethod
   notes?: string
 }
+
+export interface FinancialSummary {
+  totalPaidAmount: number
+  totalPendingAmount: number
+  paidCount: number
+  pendingCount: number
+  totalCount: number
+}
+
+export interface PaymentFilter {
+  studentId?: string
+  status?: string
+  search?: string
+  from?: string
+  to?: string
+}

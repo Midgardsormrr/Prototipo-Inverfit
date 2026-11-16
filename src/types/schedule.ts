@@ -68,6 +68,8 @@ export interface AssignSessionDTO {
   endTime: string
   durationMinutes?: number
   isRecurring?: boolean
+  startDate?: string
+  endDate?: string
   notes?: string
 }
 
@@ -80,6 +82,8 @@ export interface AssignStudentDTO {
   durationMinutes?: number
   endTime?: string
   isRecurring?: boolean
+  startDate?: string
+  endDate?: string
   notes?: string
 }
 

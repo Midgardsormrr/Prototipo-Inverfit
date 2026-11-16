@@ -508,34 +508,81 @@ Para mantener total transparencia con el cliente y el equipo técnico, a continu
 
 ---
 
-## 10. Preparación para Futuras Etapas (Integración con Backend en Go)
+## 10. Implementación del Backend (Go + Gin + MongoDB) y Conexión Frontend (Fases 1, 2, 3 y 4A)
 
-La arquitectura actual fue concebida deliberadamente para simplificar la transición hacia un backend robusto desarrollado en **Go**:
+A partir de las Fases 1, 2, 3 y 4A, el proyecto cuenta con infraestructura backend real, CRUD de alumnos, el motor completo de agenda semanal y el módulo financiero de pagos y membresías:
 
-### 10.1. Correspondencia Directa de Entidades (DTOs a Structs en Go)
-Las interfaces de TypeScript en `src/types/` poseen una correspondencia directa uno a uno con estructuras típicas en Go:
+### 10.1. Infraestructura Backend (Go 1.23+ / Gin / MongoDB 7.0)
+- **Monolito modular por capas:** Router → Handler → Service → Repository → MongoDB.
+- **Seguridad:** CORS estricto, ofuscación de credenciales en logs (`RedactedMongoURI`), variables de entorno locales protegidas de git.
+- **Docker Compose:** Orquestación local de MongoDB 7.0 oficial en `backend/compose.yaml` con volumen persistente `inverfit-mongo-data`.
+- **Healthchecks:** `/health/live` (liveness) y `/health/ready` (readiness con ping a MongoDB).
 
-```go
-// Ejemplo de equivalencia para Go:
-type ScheduleBlock struct {
-    ID              string   `json:"id" db:"id"`
-    Day             string   `json:"day" db:"day"`
-    StartTime       string   `json:"startTime" db:"start_time"`
-    EndTime         string   `json:"endTime" db:"end_time"`
-    DurationMinutes int      `json:"durationMinutes" db:"duration_minutes"`
-    Type            string   `json:"type" db:"type"`
-    StudentIDs      []string `json:"studentIds" db:"student_ids"`
-    IsRecurring     bool     `json:"isRecurring" db:"is_recurring"`
-    Notes           string   `json:"notes" db:"notes"`
-}
-```
+### 10.2. Módulo de Alumnos (Fase 2)
+- **Endpoints REST (`/api/v1/students`):**
+  - `GET /api/v1/students`: listado con filtros reactivos (`name`, `status`, `frequency`).
+  - `GET /api/v1/students/:id`: detalle por identificador hexadecimal (ObjectID).
+  - `POST /api/v1/students`: creación con validaciones y valores por defecto.
+  - `PUT /api/v1/students/:id`: actualización parcial de datos de contacto y condiciones.
+  - `DELETE /api/v1/students/:id`: baja lógica (*soft delete*) preservando historial mediante `archivedAt`.
+- **Modo Dual en Frontend (Vue 3 / Pinia):**
+  - `VITE_STUDENTS_DATA_SOURCE=mock` (por defecto): Mantiene funcionamiento autónomo en `localStorage` para Cloudflare Pages y demostraciones sin servidor.
+  - `VITE_STUDENTS_DATA_SOURCE=api`: Delega en `StudentApiService` llamando al backend Go en `VITE_API_BASE_URL`. Sin fallback silencioso a mock.
+  - Interfaz de usuario enriquecida con indicador de fuente de datos (badge Mock/API), botón de refresco, banner de reintento, estados de carga y pantalla de alumno no encontrado (404) con retorno asistido.
 
-### 10.2. Capa de Servicios Aislada
-Los servicios ubicados en `src/services/` (`students.ts`, `schedule.ts`, `payments.ts`, etc.) encapsulan completamente el acceso a datos. Cuando se implemente la API REST en Go, **no será necesario modificar los componentes Vue ni los modales**: únicamente se reemplazarán los métodos internos de los servicios para realizar peticiones HTTP (`fetch` o `axios`) hacia los endpoints correspondientes:
+### 10.3. Módulo de Agenda Semanal y Disponibilidad (Fase 3)
+- **Endpoints REST (`/api/v1/schedule`):**
+  - Disponibilidad semanal: `GET /availability`, `GET /availability/:day`, `PUT /availability/:day`, `DELETE /availability/:day`.
+  - Sesiones y Proyección de Calendario: `GET /sessions?from=&to=&studentId=`, `POST /sessions`, `GET /sessions/:id`, `PUT /sessions/:id`, `DELETE /sessions/:id`.
+  - Excepciones de Calendario: `POST /sessions/:id/exceptions`, `GET /exceptions`, `DELETE /sessions/:id/exceptions/:exceptionId`.
+- **Reglas de Negocio en Go:**
+  - Administración exclusiva del entrenador.
+  - Disponibilidad diaria por intervalos (`06:30` - `22:00`).
+  - Duración sugerida 75 min (libremente editable).
+  - Cero descansos forzados (sesiones continuas perfectamente válidas).
+  - Verificación estricta de solapamiento temporal (`startA < endB && startB < endA`) sensible a rangos de vigencia de fechas (`startDate` y `endDate`) y excepciones activas de calendario (las fechas canceladas o reprogramadas no bloquean el horario original, y las sesiones movidas validan conflictos en destino).
+  - Detección de conflicto al reducir disponibilidad (`409 AVAILABILITY_CONFLICT`).
+  - Excepciones de calendario canceladas y reprogramadas con proyección sobre zona horaria `America/Santiago`.
+  - Desacoplamiento modular estricto mediante interfaz `StudentReader` y adaptador en `main.go`.
+- **Modo Dual en Frontend:**
+  - `VITE_SCHEDULE_DATA_SOURCE=mock` (por defecto) | `api`.
+  - Delegación transparente mediante `scheduleService` (`schedule.mock.ts` y `schedule.api.ts`).
+  - Ficha del alumno obtiene el horario asignado dinámicamente desde las sesiones activas de la agenda.
+  - **Garantía de serialización no nula y resiliencia:** Todas las respuestas de colecciones (`/sessions`, `/availability`, `/exceptions`, `intervals`, `studentIds`, `conflicts`) garantizan la serialización de arreglos vacíos `[]` en el backend Go (evitando serializar `null`), y el cliente frontend normaliza defensivamente los arreglos para prevenir excepciones de tipo `Cannot read properties of null (reading 'map')`.
 
-```
-[ Vista Vue ]  ──►  [ Pinia Store ]  ──►  [ Servicio TS ]  ──(HTTP REST)──►  [ Backend en Go ]
-```
+### 10.4. Módulo de Pagos y Membresías (Fase 4A)
+- **Endpoints REST (`/api/v1/payments`):**
+  - Listado y filtros: `GET /payments?studentId=&status=&search=&from=&to=`.
+  - Registro de abonos: `POST /payments`.
+  - Balance consolidado: `GET /payments/summary` (cálculo en vivo mediante agregaciones en MongoDB).
+  - Exportación streaming: `GET /payments/export` (CSV en UTF-8 con BOM y desinfección contra inyección de fórmulas `=, +, -, @`).
+  - Historial por alumno: `GET /payments/student/:studentId`.
+  - Detalle, actualización y soft-delete: `GET /payments/:id`, `PUT /payments/:id`, `DELETE /payments/:id`.
+  - Simulaciones operativas: `POST /payments/:id/simulate-reminder`, `POST /payments/:id/simulate-receipt`.
+- **Reglas de Negocio en Go:**
+  - Precisión monetaria entera en pesos chilenos (`int64` CLP), evitando imprecisiones de coma flotante.
+  - Preservación irrestricta del historial financiero mediante borrado lógico (`archivedAt`).
+  - Activación automática de membresía (`Por revisar` → `Activo`) vía `StudentReader` al confirmar un pago.
+  - Desacoplamiento modular absoluto respecto a la colección de alumnos.
+- **Modo Dual en Frontend:**
+  - `VITE_PAYMENTS_DATA_SOURCE=mock` (por defecto) | `api`.
+  - Delegador `paymentService` (`payments.mock.ts` y `payments.api.ts`).
+  - Vista `MembresiasPagosView.vue` enriquecida con badge de fuente de datos, botón de recarga, estados de carga y exportación reactiva.
+
+### 10.5. Despliegue Dockerizado Unificado del Backend (compose.stack.yaml)
+- **Construcción Multi-stage (`backend/Dockerfile`):**
+  - Compilación estática pura (`CGO_ENABLED=0`, `-trimpath`, `-ldflags="-w -s"`) en `golang:1.25-alpine`.
+  - Imagen final mínima en `alpine:3.20` con certificados CA (`ca-certificates`), zona horaria `tzdata` (`TZ=America/Santiago`) y herramienta `curl` para comprobaciones de salud.
+  - Usuario no privilegiado `appuser:appgroup` (UID:GID `10001:10001`), sin compiladores ni secretos en la imagen final.
+- **Orquestación y Red Aislada (`compose.stack.yaml`):**
+  - Red interna privada tipo bridge (`inverfit-stack-net`).
+  - Servicio `api`: mapeado exclusivamente a `127.0.0.1:8080` en el host, con comprobación periódica de salud (`/health/ready`).
+  - Servicio `mongodb`: imagen oficial `mongo:7.0`, sin puertos publicados al host para prevenir colisiones con el entorno de desarrollo local (puerto 27017).
+- **Persistencia Segura y Credenciales de Aplicación:**
+  - Volumen persistente dedicado e independiente: `inverfit-stack-mongo-data` (aislado de `inverfit-mongo-data`).
+  - Script de inicialización `docker/init-mongo.sh` para crear el usuario de aplicación `inverfit_app` con permisos `readWrite` sobre `inverfit_container`.
+  - La API Go opera conectada con el usuario de aplicación, nunca con credenciales root.
+  - Persistencia de datos validada ante reinicio de API, reinicio de base de datos y recreación de contenedor de MongoDB sin pérdida de volumen.
 
 ---
 
@@ -564,7 +611,8 @@ Los servicios ubicados en `src/services/` (`students.ts`, `schedule.ts`, `paymen
 | **Validación de tipos y compilación** | **Implementada y comprobada** | `vue-tsc` y `vite build` finalizan con código 0 y sin errores. |
 | **Criterios de evaluación física de Pablo** | *Implementada, pendiente de validación* | Esquema dinámico listo; pendiente definir pruebas físicas estándar del centro. |
 | **Planes tarifarios oficiales** | *Implementada, pendiente de validación* | Funciona con montos libres; requiere fijar aranceles oficiales por plan. |
-| **Backend en Go y Base de Datos SQL** | *Pendiente de desarrollo* | Previsto para la fase de arquitectura de servidores y APIs de producción. |
+| **Backend en Go + MongoDB (Fases 1, 2, 3 y 4A)** | **Implementada y comprobada** | Servidor Gin, Docker MongoDB 7.0, Alumnos, Agenda, Pagos y Balances (/api/v1/payments) y modo dual en Vue. |
+| **Stack Dockerizado Unificado del Backend** | **Implementada y comprobada** | Dockerfile multi-stage (Alpine, non-root, tzdata), compose.stack.yaml, persistencia en inverfit-stack-mongo-data y credenciales de app no-root. |
 | **Pasarela real de pagos (Webpay/Stripe)** | *Pendiente de desarrollo* | Requiere contrato bancario comercial y credenciales API del proveedor. |
 | **Portal web de autoatención para Alumnos** | *Pendiente de desarrollo* | Fuera del alcance del panel del entrenador en la presente versión. |
 | **Firma Electrónica Avanzada (FEA)** | *Pendiente de desarrollo* | Requiere integración con prestador acreditado de certificación digital. |

@@ -158,12 +158,45 @@ Los artefactos listos para despliegue se generarán en el directorio `dist/`.
 
 ---
 
-## 🔌 Preparación para Futura Integración con Backend Go
+## 🔌 Backend Go + Gin + MongoDB y Despliegue Dockerizado
 
-La arquitectura está diseñada para una transición directa hacia una API REST en Go:
-- Los métodos de `src/services/` retornan promesas y manejan DTOs tipados.
-- Para conectar la API en Go, solo se requiere reemplazar las llamadas a `storage.get/set` por llamadas `fetch` o `axios` dirigidas a los endpoints (ej. `GET /api/v1/students`, `POST /api/v1/schedule/assign`, etc.).
-- Las vistas y componentes no tienen acoplamiento directo a `localStorage`.
+La plataforma cuenta con un backend modular implementado en **Go + Gin** conectado a **MongoDB 7.0**, con soporte completo para alternar dinámicamente entre modo simulado (`mock`) y modo real (`api`):
+
+- **Módulos con persistencia real:** Alumnos (`/api/v1/students`), Agenda Semanal y Disponibilidad (`/api/v1/schedule`), Pagos y Finanzas (`/api/v1/payments`).
+- **Modo Dual configurable:** Mediante variables de entorno en el frontend (`.env`):
+  - `VITE_STUDENTS_DATA_SOURCE=api` | `mock`
+  - `VITE_SCHEDULE_DATA_SOURCE=api` | `mock`
+  - `VITE_PAYMENTS_DATA_SOURCE=api` | `mock`
+  - `VITE_API_BASE_URL=http://localhost:8080/api/v1`
+
+### Modos de Ejecución del Backend
+
+1. **Desarrollo Local (Backend en Windows + MongoDB en Docker):**
+   ```bash
+   # Iniciar MongoDB en segundo plano
+   cd backend
+   docker compose up -d
+
+   # Iniciar la API REST en Go
+   go run ./cmd/api
+   ```
+
+2. **Stack Completo Dockerizado (API + MongoDB en contenedores independientes):**
+   ```bash
+   # Copiar archivo de entorno
+   cp .env.stack.example .env.stack
+
+   # Levantar el stack completo (API en 127.0.0.1:8080 y MongoDB interno)
+   docker compose -f compose.stack.yaml --env-file .env.stack up -d --build
+
+   # Comprobar salud del stack
+   docker compose -f compose.stack.yaml --env-file .env.stack ps
+   ```
+
+Para más detalles sobre la arquitectura de la API, endpoints, seguridad y procedimientos de respaldo, consulte [`backend/README.md`](file:///c:/Users/diego/OneDrive/Documentos/GitHub/Prototipo-Inverfit/backend/README.md).
+
+
+
 
 ---
 

@@ -8,12 +8,15 @@ import (
 	"inverfit-backend/internal/database"
 	"inverfit-backend/internal/handlers"
 	"inverfit-backend/internal/middleware"
+	"inverfit-backend/internal/modules/payments"
+	"inverfit-backend/internal/modules/schedule"
+	"inverfit-backend/internal/modules/students"
 
 	"github.com/gin-gonic/gin"
 )
 
 // Setup configura e inicializa el router de Gin con middlewares, rutas y manejadores de error uniformes.
-func Setup(cfg *config.Config, db database.Pinger, logger *slog.Logger) *gin.Engine {
+func Setup(cfg *config.Config, db database.Pinger, studentsHandler *students.Handler, scheduleHandler *schedule.Handler, paymentsHandler *payments.Handler, logger *slog.Logger) *gin.Engine {
 	if cfg.AppEnv == "production" {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -46,7 +49,7 @@ func Setup(cfg *config.Config, db database.Pinger, logger *slog.Logger) *gin.Eng
 		})
 	})
 
-	// Inicializar Handlers
+	// Inicializar Handlers de Salud
 	healthHandler := handlers.NewHealthHandler(db)
 
 	// Grupo de endpoints de salud y diagnóstico
@@ -54,6 +57,23 @@ func Setup(cfg *config.Config, db database.Pinger, logger *slog.Logger) *gin.Eng
 	{
 		healthGroup.GET("/live", healthHandler.Live)
 		healthGroup.GET("/ready", healthHandler.Ready)
+	}
+
+	// Grupo de endpoints de API v1
+	v1 := r.Group("/api/v1")
+	{
+		if studentsHandler != nil {
+			studentsGroup := v1.Group("/students")
+			studentsHandler.RegisterRoutes(studentsGroup)
+		}
+		if scheduleHandler != nil {
+			scheduleGroup := v1.Group("/schedule")
+			scheduleHandler.RegisterRoutes(scheduleGroup)
+		}
+		if paymentsHandler != nil {
+			paymentsGroup := v1.Group("/payments")
+			paymentsHandler.RegisterRoutes(paymentsGroup)
+		}
 	}
 
 	return r

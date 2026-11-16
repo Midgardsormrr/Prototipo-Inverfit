@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGymStore } from '@/stores/gym'
 import { Calendar, Users, CreditCard, ChevronRight } from 'lucide-vue-next'
@@ -10,6 +10,15 @@ import type { ScheduleBlock } from '@/types'
 
 const router = useRouter()
 const gymStore = useGymStore()
+
+onMounted(() => {
+  if (gymStore.isScheduleApiMode()) {
+    gymStore.loadSchedule().catch(() => {})
+  }
+  if (gymStore.isPaymentsApiMode()) {
+    gymStore.loadPayments().catch(() => {})
+  }
+})
 
 const showRegisterModal = ref(false)
 const showBlockModal = ref(false)
@@ -274,6 +283,8 @@ function getAssignedCount(block: ScheduleBlock) {
       :open="showBlockModal"
       :block="activeBlock"
       @close="showBlockModal = false"
+      @deleted="gymStore.refreshScheduleState"
+      @updated="gymStore.refreshScheduleState"
       @add-student="handleAddStudentToBlock"
     />
 
@@ -284,7 +295,7 @@ function getAssignedCount(block: ScheduleBlock) {
       :initial-time="activeBlock?.startTime"
       :initial-end-time="activeBlock?.endTime"
       @close="showAssignModal = false"
-      @assigned="gymStore.reloadData"
+      @assigned="gymStore.refreshScheduleState"
     />
   </div>
 </template>

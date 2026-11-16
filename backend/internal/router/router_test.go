@@ -35,7 +35,7 @@ func testLogger() *slog.Logger {
 }
 
 func TestRouterHealthLive(t *testing.T) {
-	r := Setup(testConfig(), &mockPinger{}, testLogger())
+	r := Setup(testConfig(), &mockPinger{}, nil, nil, nil, testLogger())
 
 	req := httptest.NewRequest(http.MethodGet, "/health/live", nil)
 	w := httptest.NewRecorder()
@@ -55,7 +55,7 @@ func TestRouterHealthLive(t *testing.T) {
 }
 
 func TestRouterNotFound(t *testing.T) {
-	r := Setup(testConfig(), &mockPinger{}, testLogger())
+	r := Setup(testConfig(), &mockPinger{}, nil, nil, nil, testLogger())
 
 	req := httptest.NewRequest(http.MethodGet, "/ruta/inexistente", nil)
 	w := httptest.NewRecorder()
@@ -75,7 +75,7 @@ func TestRouterNotFound(t *testing.T) {
 }
 
 func TestRouterMethodNotAllowed(t *testing.T) {
-	r := Setup(testConfig(), &mockPinger{}, testLogger())
+	r := Setup(testConfig(), &mockPinger{}, nil, nil, nil, testLogger())
 
 	// /health/live solo acepta GET, enviamos POST
 	req := httptest.NewRequest(http.MethodPost, "/health/live", nil)

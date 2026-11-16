@@ -13,8 +13,69 @@ import (
 
 	"inverfit-backend/internal/config"
 	"inverfit-backend/internal/database"
+	"inverfit-backend/internal/modules/payments"
+	"inverfit-backend/internal/modules/schedule"
+	"inverfit-backend/internal/modules/students"
 	"inverfit-backend/internal/router"
 )
+
+// studentReaderAdapter conecta el servicio de alumnos con la interfaz requerida por Agenda,
+// garantizando la independencia modular e imposibilitando el acceso directo a la colección students.
+type studentReaderAdapter struct {
+	service students.Service
+}
+
+func (a *studentReaderAdapter) GetStudentsSummary(ctx context.Context, ids []string) ([]schedule.StudentSummary, error) {
+	var summaries []schedule.StudentSummary
+	for _, id := range ids {
+		st, err := a.service.GetByID(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		summaries = append(summaries, schedule.StudentSummary{
+			ID:       st.ID,
+			FullName: st.FullName,
+			Archived: false,
+		})
+	}
+	return summaries, nil
+}
+
+// paymentsStudentReaderAdapter conecta el servicio de alumnos con la interfaz requerida por Pagos,
+// permitiendo consultar datos del alumno y activar membresías "Por revisar" sin acoplamiento a MongoDB.
+type paymentsStudentReaderAdapter struct {
+	service students.Service
+}
+
+func (a *paymentsStudentReaderAdapter) GetStudent(ctx context.Context, id string) (*payments.StudentInfo, error) {
+	st, err := a.service.GetByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &payments.StudentInfo{
+		ID:               st.ID,
+		FullName:         st.FullName,
+		PlanName:         st.PlanName,
+		Frequency:        st.Frequency,
+		MembershipStatus: st.MembershipStatus,
+		Archived:         false,
+	}, nil
+}
+
+func (a *paymentsStudentReaderAdapter) ActivateMembershipIfReviewing(ctx context.Context, studentID string) error {
+	st, err := a.service.GetByID(ctx, studentID)
+	if err != nil {
+		return err
+	}
+	if st.MembershipStatus == "Por revisar" {
+		statusActive := "Activo"
+		_, err = a.service.Update(ctx, studentID, students.UpdateStudentRequest{
+			MembershipStatus: &statusActive,
+		})
+		return err
+	}
+	return nil
+}
 
 func main() {
 	// 1. Cargar configuración desde variables de entorno y archivo .env opcional
@@ -67,14 +128,57 @@ func main() {
 		)
 	}
 
-	// 4. Configurar Router de Gin
+	// 4. Configurar Módulo de Alumnos
+	var studentsRepo students.Repository
+	if mongoDB != nil && mongoDB.Database != nil {
+		studentsRepo = students.NewRepository(mongoDB.Database)
+	} else {
+		studentsRepo = students.NewRepository(nil)
+	}
+	studentsService := students.NewService(studentsRepo)
+	studentsHandler := students.NewHandler(studentsService)
+
+	// 5. Configurar Módulo de Agenda (Schedule)
+	var scheduleRepo schedule.Repository
+	if mongoDB != nil && mongoDB.Database != nil {
+		scheduleRepo = schedule.NewRepository(mongoDB.Database)
+		// Asegurar índices de colecciones de agenda
+		idxCtx, idxCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		if err := scheduleRepo.EnsureIndexes(idxCtx); err != nil {
+			logger.Warn("No se pudieron verificar los índices de agenda", slog.String("error", err.Error()))
+		}
+		idxCancel()
+	} else {
+		scheduleRepo = schedule.NewRepository(nil)
+	}
+	studentReader := &studentReaderAdapter{service: studentsService}
+	scheduleService := schedule.NewService(scheduleRepo, studentReader)
+	scheduleHandler := schedule.NewHandler(scheduleService)
+
+	// 6. Configurar Módulo de Pagos
+	var paymentRepo payments.Repository
+	if mongoDB != nil && mongoDB.Database != nil {
+		paymentRepo = payments.NewRepository(mongoDB.Database)
+		idxCtx, idxCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		if err := paymentRepo.EnsureIndexes(idxCtx); err != nil {
+			logger.Warn("No se pudieron verificar los índices de pagos", slog.String("error", err.Error()))
+		}
+		idxCancel()
+	} else {
+		paymentRepo = payments.NewRepository(nil)
+	}
+	paymentStudentReader := &paymentsStudentReaderAdapter{service: studentsService}
+	paymentService := payments.NewService(paymentRepo, paymentStudentReader)
+	paymentHandler := payments.NewHandler(paymentService)
+
+	// 7. Configurar Router de Gin
 	var pinger database.Pinger
 	if mongoDB != nil {
 		pinger = mongoDB
 	}
-	r := router.Setup(cfg, pinger, logger)
+	r := router.Setup(cfg, pinger, studentsHandler, scheduleHandler, paymentHandler, logger)
 
-	// 5. Configurar Servidor HTTP con timeouts defensivos
+	// 8. Configurar Servidor HTTP con timeouts defensivos
 	srv := &http.Server{
 		Addr:         ":" + cfg.HTTPPort,
 		Handler:      r,
