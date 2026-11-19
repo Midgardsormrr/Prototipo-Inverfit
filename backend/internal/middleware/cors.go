@@ -12,9 +12,12 @@ import (
 func CORS(allowedOrigins []string) gin.HandlerFunc {
 	// Mapeo en memoria para búsqueda O(1) de orígenes permitidos
 	allowedMap := make(map[string]bool, len(allowedOrigins))
+	allowAll := false
 	for _, origin := range allowedOrigins {
 		trimmed := strings.TrimSpace(origin)
-		if trimmed != "" {
+		if trimmed == "*" {
+			allowAll = true
+		} else if trimmed != "" {
 			allowedMap[trimmed] = true
 		}
 	}
@@ -22,7 +25,7 @@ func CORS(allowedOrigins []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
 
-		if origin != "" && allowedMap[origin] {
+		if origin != "" && (allowAll || allowedMap[origin]) {
 			c.Header("Access-Control-Allow-Origin", origin)
 			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 			c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization")

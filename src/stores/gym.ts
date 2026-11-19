@@ -181,6 +181,7 @@ export const useGymStore = defineStore('gym', () => {
       const list = await studentService.getAll(filter)
       students.value = list
       syncContractsWithStudents(list)
+      syncEvaluationsWithStudents(list)
       return list
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al cargar alumnos'
@@ -199,7 +200,11 @@ export const useGymStore = defineStore('gym', () => {
    * Elimina cualquier alumno de prueba residual y asegura que cada alumno registrado tenga su contrato.
    */
   function syncContractsWithStudents(studentList: Student[]) {
-    if (!studentList || studentList.length === 0) return
+    if (!studentList || studentList.length === 0) {
+      contracts.value = []
+      storage.setContracts([])
+      return
+    }
 
     const existingContracts = storage.getContracts().filter(c => !c.studentName.toLowerCase().includes('alumno de ejemplo'))
     const syncedContracts: ContractConsent[] = []
@@ -253,6 +258,28 @@ export const useGymStore = defineStore('gym', () => {
 
     contracts.value = syncedContracts
     storage.setContracts(syncedContracts)
+  }
+
+  /**
+   * Sincroniza dinámicamente las evaluaciones con los alumnos reales del gimnasio.
+   */
+  function syncEvaluationsWithStudents(studentList: Student[]) {
+    if (!studentList || studentList.length === 0) {
+      evaluations.value = []
+      storage.setEvaluations([])
+      return
+    }
+
+    const currentEvals = storage.getEvaluations()
+    const validStudentIds = new Set(studentList.map(s => s.id))
+    const validStudentNames = new Set(studentList.map(s => s.fullName.trim().toLowerCase()))
+
+    const filteredEvals = currentEvals.filter(e => 
+      validStudentIds.has(e.studentId) || validStudentNames.has(e.studentName.trim().toLowerCase())
+    )
+
+    evaluations.value = filteredEvals
+    storage.setEvaluations(filteredEvals)
   }
 
   // Subscribe to storage changes

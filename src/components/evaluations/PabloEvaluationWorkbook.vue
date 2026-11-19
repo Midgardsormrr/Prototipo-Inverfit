@@ -913,7 +913,7 @@ function handlePrint() {
             <div>
               <label class="block text-[#6B6D74] font-bold uppercase text-[10px] mb-1">Nombre Completo:</label>
               <input
-                :value="currentStudent?.fullName || 'Nelson Test Onboarding'"
+                :value="currentStudent?.fullName || 'Seleccione alumno'"
                 readonly
                 class="w-full h-8 px-2.5 bg-[#FAF9F6] border border-[#DCD8CF] rounded font-bold text-[#191A1D] cursor-not-allowed"
               />

@@ -91,7 +91,27 @@ class LocalStorageService {
     }
   }
 
+  public cleanupLegacyDemoData(): void {
+    if (!this.hasStorage()) return
+    const rawContracts = this.getItem(STORAGE_KEYS.CONTRACTS)
+    const rawStudents = this.getItem(STORAGE_KEYS.STUDENTS)
+    const rawEvals = this.getItem(STORAGE_KEYS.EVALUATIONS)
+    if (
+      (rawContracts && (rawContracts.includes('Camila Morales') || rawContracts.includes('Valeria Soto') || rawContracts.includes('Carlos Valenzuela') || rawContracts.includes('Nelson Test Onboarding') || rawContracts.includes('cnt-0'))) ||
+      (rawStudents && (rawStudents.includes('alu-0') || rawStudents.includes('Camila Morales') || rawStudents.includes('Carlos Valenzuela') || rawStudents.includes('Nelson Test Onboarding'))) ||
+      (rawEvals && (rawEvals.includes('Camila Morales') || rawEvals.includes('Carlos Valenzuela') || rawEvals.includes('Nelson Test Onboarding') || rawEvals.includes('eval-0') || rawEvals.includes('eval-nelson')))
+    ) {
+      this.set(STORAGE_KEYS.STUDENTS, [])
+      this.set(STORAGE_KEYS.PAYMENTS, [])
+      this.set(STORAGE_KEYS.SCHEDULE, [])
+      this.set(STORAGE_KEYS.EXCEPTIONS, [])
+      this.set(STORAGE_KEYS.EVALUATIONS, [])
+      this.set(STORAGE_KEYS.CONTRACTS, [])
+    }
+  }
+
   public initData() {
+    this.cleanupLegacyDemoData()
     this.getMigratedOrInit(STORAGE_KEYS.STUDENTS, initialStudents)
     this.getMigratedOrInit(STORAGE_KEYS.PAYMENTS, initialPayments)
     this.getMigratedOrInit(STORAGE_KEYS.SCHEDULE, initialScheduleBlocks)
@@ -177,14 +197,13 @@ class LocalStorageService {
 
   public getEvaluations(): Evaluation[] {
     const list = this.get<Evaluation[]>(STORAGE_KEYS.EVALUATIONS, initialEvaluations)
-    // Verify if default official evaluations are present; if not, merge them seamlessly
-    const hasNelson = list.some(e => e.studentId === '6afe0c22633d726169887111' || e.id === 'eval-nelson-official')
-    if (!hasNelson) {
-      const merged = [...initialEvaluations, ...list.filter(e => !initialEvaluations.some(init => init.id === e.id))]
-      this.setEvaluations(merged)
-      return merged
-    }
-    return list
+    return list.filter(e => 
+      !e.studentName.includes('Camila Morales') && 
+      !e.studentName.includes('Carlos Valenzuela') &&
+      !e.studentName.includes('Nelson Test Onboarding') &&
+      !e.id.startsWith('eval-0') &&
+      !e.id.includes('nelson-official')
+    )
   }
 
   public setEvaluations(evaluations: Evaluation[]) {
@@ -193,14 +212,15 @@ class LocalStorageService {
 
   public getContracts(): ContractConsent[] {
     const list = this.get<ContractConsent[]>(STORAGE_KEYS.CONTRACTS, initialContracts)
-    const hasExample = list.some(c => c.studentName.toLowerCase().includes('alumno de ejemplo'))
-    if (hasExample) {
-      const filtered = list.filter(c => !c.studentName.toLowerCase().includes('alumno de ejemplo'))
-      const result = filtered.length > 0 ? filtered : initialContracts
-      this.setContracts(result)
-      return result
-    }
-    return list
+    return list.filter(c => 
+      !c.studentName.toLowerCase().includes('alumno de ejemplo') &&
+      !c.studentName.includes('Camila Morales') &&
+      !c.studentName.includes('Felipe Arancibia') &&
+      !c.studentName.includes('Valeria Soto') &&
+      !c.studentName.includes('Carlos Valenzuela') &&
+      !c.studentName.includes('Nelson Test Onboarding') &&
+      !c.id.startsWith('cnt-0')
+    )
   }
 
   public setContracts(contracts: ContractConsent[]) {

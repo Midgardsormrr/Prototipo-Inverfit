@@ -24,11 +24,22 @@ export class HttpClient {
   private defaultTimeoutMs: number
 
   constructor(
-    baseUrl: string = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:8080/api/v1',
+    baseUrl: string = (import.meta.env.VITE_API_BASE_URL as string) || '',
     defaultTimeoutMs: number = 10000
   ) {
-    // Asegurar que no tenga barra final
-    this.baseUrl = baseUrl.replace(/\/+$/, '')
+    let finalBaseUrl = baseUrl ? baseUrl.trim() : ''
+
+    // Si estamos corriendo en un entorno en la nube (ej. Vercel) y no en localhost,
+    // garantizamos que las peticiones apunten al backend desplegado en Render (evita fallo de localhost)
+    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      if (!finalBaseUrl || finalBaseUrl.includes('localhost') || finalBaseUrl.includes('127.0.0.1')) {
+        finalBaseUrl = 'https://inverfit-api.onrender.com/api/v1'
+      }
+    } else if (!finalBaseUrl) {
+      finalBaseUrl = 'http://localhost:8081/api/v1'
+    }
+
+    this.baseUrl = finalBaseUrl.replace(/\/+$/, '')
     this.defaultTimeoutMs = defaultTimeoutMs
   }
 

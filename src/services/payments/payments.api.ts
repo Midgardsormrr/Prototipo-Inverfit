@@ -97,7 +97,14 @@ export class PaymentApiService implements IPaymentService {
   }
 
   async exportToCSV(filter?: PaymentFilter): Promise<string> {
-    const baseUrl = (import.meta.env.VITE_API_BASE_URL as string) || 'http://localhost:8080/api/v1'
+    let baseUrl = (import.meta.env.VITE_API_BASE_URL as string) || ''
+    if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      if (!baseUrl || baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1')) {
+        baseUrl = 'https://inverfit-api.onrender.com/api/v1'
+      }
+    } else if (!baseUrl) {
+      baseUrl = 'http://localhost:8081/api/v1'
+    }
     const cleanBaseUrl = baseUrl.replace(/\/+$/, '')
     const params = new URLSearchParams()
     if (filter) {
