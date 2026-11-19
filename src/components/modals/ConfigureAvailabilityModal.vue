@@ -3,7 +3,7 @@ import { ref, watch } from 'vue'
 import { useGymStore } from '@/stores/gym'
 import { timeToMinutes, minutesToTime, DAY_NAMES } from '@/services/schedule'
 import type { DayOfWeek, DayAvailability, ScheduleBlock } from '@/types'
-import { Plus, Trash2, Clock, AlertTriangle, Check, Copy } from 'lucide-vue-next'
+import { Plus, Trash2, Clock, AlertTriangle, Check, Copy, Sparkles } from 'lucide-vue-next'
 
 const props = defineProps<{
   open: boolean
@@ -129,6 +129,29 @@ function copyToWeekdays() {
   gymStore.showToast(`Horario copiado a todos los días hábiles (Lun a Vie).`, 'info')
 }
 
+function applyPabloTemplate() {
+  const weekdays: DayOfWeek[] = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie']
+  draftAvailability.value.forEach(day => {
+    if (weekdays.includes(day.day)) {
+      day.enabled = true
+      day.intervals = [
+        { id: `int-${day.day.toLowerCase()}-1`, startTime: '06:30', endTime: '14:00' },
+        { id: `int-${day.day.toLowerCase()}-2`, startTime: '16:00', endTime: '22:00' }
+      ]
+    } else if (day.day === 'Sáb') {
+      day.enabled = true
+      day.intervals = [
+        { id: `int-sab-eval`, startTime: '06:30', endTime: '13:00' }
+      ]
+    } else {
+      // Domingo descanso
+      day.enabled = false
+      day.intervals = []
+    }
+  })
+  gymStore.showToast('Plantilla oficial de Pablo aplicada (Lun-Vie 06:30-14:00 y 16:00-22:00, Sáb 06:30-13:00).', 'info', 'Plantilla cargada')
+}
+
 async function handleSave() {
   errorMessage.value = ''
   conflicts.value = []
@@ -229,6 +252,27 @@ async function handleSave() {
               <span class="text-amber-800">{{ c.studentIds.length }} alumno(s)</span>
             </div>
           </div>
+        </div>
+
+        <!-- Pablo's Standard Template Banner & Quick Action -->
+        <div class="p-3.5 bg-[#FAF6EC] border border-[#E8DEC7] rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <span class="text-xs font-bold text-[#191A1D] flex items-center gap-1.5">
+              <Sparkles class="w-3.5 h-3.5 text-[#CEA549]" />
+              Plantilla Semanal Oficial INVERFIT (Pablo)
+            </span>
+            <p class="text-[11px] text-[#6B6D74] mt-0.5">
+              Lun a Vie (06:30–14:00 y 16:00–22:00) · Sábados: Evaluaciones (06:30–13:00) · Dom: Cerrado
+            </p>
+          </div>
+          <button
+            type="button"
+            @click="applyPabloTemplate"
+            class="px-3 py-1.5 bg-[#CEA549] hover:bg-[#BA923B] text-[#0B0B0D] text-xs font-bold rounded-md transition-colors cursor-pointer shadow-xs self-start sm:self-auto flex items-center gap-1.5"
+          >
+            <Sparkles class="w-3.5 h-3.5" />
+            Aplicar plantilla
+          </button>
         </div>
 
         <!-- Day Selector Tabs -->

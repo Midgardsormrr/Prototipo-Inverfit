@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import Sidebar from '@/components/layout/Sidebar.vue'
 import TopNavbar from '@/components/layout/TopNavbar.vue'
 import ToastContainer from '@/components/ui/ToastContainer.vue'
 
+const route = useRoute()
+const isPublicRoute = computed(() => !!route.meta?.public)
 const mobileOpen = ref(false)
 
 function toggleMobile() {
@@ -16,7 +19,18 @@ function closeMobile() {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#F5F3EE] text-[#191A1D] flex flex-col font-sans">
+  <!-- Public Full-Page View (e.g. Student Onboarding / Consent) -->
+  <div v-if="isPublicRoute" class="min-h-screen bg-[#F5F3EE] text-[#191A1D] flex flex-col font-sans">
+    <router-view v-slot="{ Component }">
+      <transition name="fade" mode="out-in">
+        <component :is="Component" />
+      </transition>
+    </router-view>
+    <ToastContainer />
+  </div>
+
+  <!-- Coach Dashboard View (Sidebar + TopNavbar) -->
+  <div v-else class="min-h-screen bg-[#F5F3EE] text-[#191A1D] flex flex-col font-sans">
     <!-- Sidebar -->
     <Sidebar :mobile-open="mobileOpen" @close-mobile="closeMobile" />
 

@@ -1,6 +1,15 @@
 export type PaymentStatus = 'Pagado' | 'Pendiente' | 'Por definir'
 
-export type PaymentMethod = 'Webpay' | 'Servipag' | 'Crédito' | 'Débito' | 'Transferencia' | 'Por definir'
+export type PaymentMethod =
+  | 'SumUp (Link de pago)'
+  | 'SumUp (POS Tarjeta)'
+  | 'Transferencia Bancaria'
+  | 'Efectivo'
+  | 'Webpay'
+  | 'Crédito'
+  | 'Débito'
+  | 'Servipag'
+  | 'Por definir'
 
 export interface Payment {
   id: string
@@ -14,6 +23,8 @@ export interface Payment {
   paymentDate: string | null
   paymentMethod: PaymentMethod
   transactionReference?: string
+  voucherUrl?: string
+  voucherFileName?: string
   reminderSentCount: number
   lastReminderAt: string | null
   receiptSent: boolean
@@ -27,6 +38,9 @@ export interface RegisterPaymentDTO {
   dueDate?: string
   paymentDate?: string
   paymentMethod: PaymentMethod
+  transactionReference?: string
+  voucherUrl?: string
+  voucherFileName?: string
   notes?: string
 }
 

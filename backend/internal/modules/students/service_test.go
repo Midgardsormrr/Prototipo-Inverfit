@@ -98,8 +98,8 @@ func TestServiceCreateValid(t *testing.T) {
 	if res.MembershipStatus != StatusActive {
 		t.Errorf("estado por defecto esperado '%s', obtenido '%s'", StatusActive, res.MembershipStatus)
 	}
-	if res.PlanName != "Plan estándar" {
-		t.Errorf("plan por defecto esperado 'Plan estándar', obtenido '%s'", res.PlanName)
+	if res.PlanName != "Membresía Mensual" {
+		t.Errorf("plan por defecto esperado 'Membresía Mensual', obtenido '%s'", res.PlanName)
 	}
 	if res.ID == "" {
 		t.Errorf("ID generado no debe estar vacío")

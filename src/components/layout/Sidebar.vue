@@ -7,10 +7,10 @@ import {
   CreditCard,
   ClipboardCheck,
   FileText,
-  RotateCcw,
+  LogOut,
   X
 } from 'lucide-vue-next'
-import { useGymStore } from '@/stores/gym'
+import { useAuthStore } from '@/stores/auth'
 import BrandLogo from '@/components/brand/BrandLogo.vue'
 
 defineProps<{
@@ -23,7 +23,7 @@ const emit = defineEmits<{
 
 const route = useRoute()
 const router = useRouter()
-const gymStore = useGymStore()
+const authStore = useAuthStore()
 
 const navItems = [
   { name: 'Inicio', path: '/inicio', icon: LayoutDashboard },
@@ -46,9 +46,10 @@ function navigate(path: string) {
   emit('close-mobile')
 }
 
-function handleResetDemo() {
-  if (confirm('¿Restablecer todos los datos de demostración a su estado inicial de Figma?')) {
-    gymStore.resetDemoData()
+function handleLogout() {
+  if (confirm('¿Cerrar sesión de Coach Pablo?')) {
+    authStore.logout()
+    router.push('/login')
   }
 }
 </script>
@@ -113,7 +114,7 @@ function handleResetDemo() {
       </nav>
     </div>
 
-    <!-- Bottom Coach Profile & Reset -->
+    <!-- Bottom Coach Profile & Logout -->
     <div class="border-t border-[#282A30] p-4 bg-[#141518]">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
@@ -127,19 +128,19 @@ function handleResetDemo() {
         </div>
 
         <button
-          @click="handleResetDemo"
-          title="Restablecer datos demo"
-          class="p-2 text-[#8E9097] hover:text-[#CEA549] hover:bg-[#24262B] rounded transition-colors cursor-pointer"
-          aria-label="Restablecer datos demo"
+          @click="handleLogout"
+          title="Cerrar sesión"
+          class="p-2 text-[#8E9097] hover:text-[#D93025] hover:bg-[#24262B] rounded transition-colors cursor-pointer"
+          aria-label="Cerrar sesión"
         >
-          <RotateCcw class="w-4 h-4" />
+          <LogOut class="w-4 h-4" />
         </button>
       </div>
 
-      <div class="mt-3 pt-2 text-[10px] text-[#6B6D74] text-center border-t border-[#24262B] flex items-center justify-center gap-1">
-        <span>INVERFIT</span>
-        <span class="text-[#CEA549]">❯❯</span>
-        <span>v1.0 Prototipo</span>
+      <div class="mt-3 pt-2 text-[10px] text-[#6B6D74] text-center border-t border-[#282A30] flex items-center justify-center gap-1.5 font-medium">
+        <span class="tracking-wider text-[#A0A2A8] font-bold">INVERFIT</span>
+        <span class="text-[#CEA549] font-black">❯❯</span>
+        <span class="text-[#CEA549] font-bold">v1.1</span>
       </div>
     </div>
   </aside>

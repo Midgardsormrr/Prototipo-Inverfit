@@ -2,10 +2,10 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useGymStore } from '@/stores/gym'
 import { studentService } from '@/services/students'
-import { Send, Edit, AlertCircle, ArrowLeft, Loader2, RefreshCw } from 'lucide-vue-next'
+import { Send, Edit, AlertCircle, ArrowLeft, Loader2, RefreshCw, AlertTriangle, Check, ShieldCheck, Heart, Activity, FileCheck2 } from 'lucide-vue-next'
 import SimulatedActionModal from '@/components/modals/SimulatedActionModal.vue'
 import RegisterPaymentModal from '@/components/modals/RegisterPaymentModal.vue'
-import CreateEvaluationModal from '@/components/modals/CreateEvaluationModal.vue'
+import PabloEvaluationWorkbook from '@/components/evaluations/PabloEvaluationWorkbook.vue'
 import type { Student, FrequencyType, StudentStatus } from '@/types'
 
 const props = defineProps<{
@@ -27,7 +27,6 @@ const loadError = ref<string | null>(null)
 // Modals
 const showLinkModal = ref(false)
 const showPaymentModal = ref(false)
-const showEvalModal = ref(false)
 const generatedLink = ref('')
 
 // Computed student looks first at localStudent, then falls back to gymStore.students
@@ -72,6 +71,11 @@ async function fetchStudentData() {
   } finally {
     loadingStudent.value = false
   }
+}
+
+async function onEvaluationSaved() {
+  await gymStore.reloadData()
+  await fetchStudentData()
 }
 
 onMounted(() => {
@@ -250,7 +254,7 @@ async function toggleContractStatus() {
             {{ student.fullName }}
           </h2>
           <p class="text-[13px] text-[#6B6D74] mt-1">
-            Membresía: <strong class="text-[#191A1D]">{{ student.planName }}</strong> · {{ student.frequency }}
+            Membresía: <strong class="text-[#191A1D]">Plan {{ student.frequency }}</strong>
           </p>
           <div class="mt-2 flex items-center gap-2">
             <span
@@ -275,6 +279,21 @@ async function toggleContractStatus() {
           <Send class="w-4 h-4" />
           Enviar enlace de pago
         </button>
+      </div>
+    </div>
+
+    <!-- Medical & PAR-Q+ Alert Banner -->
+    <div
+      v-if="student.healthConditions && student.healthConditions !== 'Sin patologías ni lesiones declaradas'"
+      class="p-4 bg-[#FEF7E0] border border-[#F0D878] rounded-[10px] text-xs text-[#8C6B1B] flex items-start gap-3 shadow-2xs animate-in fade-in duration-150"
+    >
+      <AlertTriangle class="w-5 h-5 flex-shrink-0 text-[#B06000] mt-0.5" />
+      <div>
+        <p class="font-bold text-[#70520F] text-sm flex items-center gap-2">
+          Alerta Médica / Antecedentes PAR-Q+ Declarados
+          <span class="px-2 py-0.2 bg-[#B06000]/10 text-[#B06000] rounded text-[10px] font-bold uppercase">Atención</span>
+        </p>
+        <p class="mt-1 text-[#8C6B1B] leading-relaxed font-medium">{{ student.healthConditions }}</p>
       </div>
     </div>
 
@@ -335,23 +354,23 @@ async function toggleContractStatus() {
 
         <div class="divide-y divide-[#ECE8E1] text-sm">
           <div class="py-2.5 flex items-center justify-between">
-            <span class="text-[12px] text-[#6B6D74]">Frecuencia</span>
-            <span class="text-[13px] text-[#191A1D] font-semibold">{{ student.frequency }}</span>
+            <span class="text-[12px] text-[#6B6D74]">Frecuencia acordada</span>
+            <span class="text-[13px] text-[#191A1D] font-bold">{{ student.frequency }}</span>
           </div>
 
           <div class="py-2.5 flex items-center justify-between">
-            <span class="text-[12px] text-[#6B6D74]">Horario asignado</span>
+            <span class="text-[12px] text-[#6B6D74]">Horario asignado (Agenda)</span>
             <span class="text-[13px] text-[#191A1D] font-semibold">{{ studentAssignedSchedule }}</span>
           </div>
 
           <div class="py-2.5 flex items-center justify-between">
-            <span class="text-[12px] text-[#6B6D74]">Inicio de membresía</span>
-            <span class="text-[13px] text-[#191A1D] font-semibold">{{ student.membershipStartDate }}</span>
+            <span class="text-[12px] text-[#6B6D74]">Teléfono</span>
+            <span class="text-[13px] text-[#191A1D] font-medium">{{ student.phone || 'No registrado' }}</span>
           </div>
 
           <div class="py-2.5 flex items-center justify-between">
-            <span class="text-[12px] text-[#6B6D74]">Vencimiento</span>
-            <span class="text-[13px] text-[#191A1D] font-semibold">{{ student.membershipDueDate }}</span>
+            <span class="text-[12px] text-[#6B6D74]">Correo electrónico</span>
+            <span class="text-[13px] text-[#191A1D] font-medium">{{ student.email || 'No registrado' }}</span>
           </div>
         </div>
 
@@ -360,7 +379,7 @@ async function toggleContractStatus() {
             @click="currentTab = 'datos'"
             class="text-[13px] font-bold text-[#8C6B1B] hover:text-[#614910] hover:underline cursor-pointer"
           >
-            Editar datos y plan →
+            Editar datos y contacto →
           </button>
         </div>
       </div>
@@ -389,7 +408,7 @@ async function toggleContractStatus() {
             <div class="py-2.5 flex items-center justify-between">
               <span class="text-[12px] text-[#6B6D74]">Documento firmado</span>
               <span class="text-[13px] text-[#191A1D] font-semibold">
-                {{ studentContract?.signedCopyAvailable ? 'Disponible (Demostración)' : 'No disponible' }}
+                {{ student.onboarding?.digitalSignature ? 'Firma digital registrada ✓' : (studentContract?.status === 'Aceptado' ? 'Aceptado digitalmente' : 'Pendiente de firma') }}
               </span>
             </div>
           </div>
@@ -411,7 +430,7 @@ async function toggleContractStatus() {
           <h3 class="text-[16px] font-bold text-[#191A1D]">Últimos pagos</h3>
 
           <div v-if="studentPayments.length === 0" class="py-6 text-[13px] text-[#6B6D74]">
-            Todavía no hay pagos cargados en este wireframe.
+            No hay pagos registrados para este alumno.
           </div>
 
           <div v-else class="divide-y divide-[#ECE8E1] mt-3">
@@ -456,7 +475,7 @@ async function toggleContractStatus() {
           <h3 class="text-[16px] font-bold text-[#191A1D]">Evaluaciones y resultados</h3>
 
           <div v-if="studentEvaluations.length === 0" class="py-6 text-[13px] text-[#6B6D74]">
-            Registrar y consultar el seguimiento del alumno.
+            Aún no se ha registrado la evaluación física para este alumno.
           </div>
 
           <div v-else class="divide-y divide-[#ECE8E1] mt-3">
@@ -476,19 +495,52 @@ async function toggleContractStatus() {
           </div>
         </div>
 
-        <div class="pt-2 flex items-center gap-3">
+        <div class="pt-2">
           <button
             @click="currentTab = 'evaluaciones'"
-            class="h-[36px] px-4 bg-white border border-[#DCD8CF] hover:bg-[#FAF9F6] rounded-[6px] text-[13px] font-semibold text-[#191A1D] transition-colors cursor-pointer"
+            class="h-[38px] px-4 bg-[#CEA549] hover:bg-[#BA923B] text-[#0B0B0D] rounded-[6px] text-[13px] font-bold transition-all cursor-pointer shadow-xs flex items-center justify-center gap-2 w-full sm:w-auto"
           >
-            Ver evaluaciones
+            <Activity class="w-4 h-4" />
+            <span>Abrir evaluación científica →</span>
           </button>
-          <button
-            @click="showEvalModal = true"
-            class="h-[36px] px-3.5 bg-[#CEA549] text-[#0B0B0D] rounded-[6px] text-[12px] font-bold hover:bg-[#BA923B] transition-colors cursor-pointer shadow-xs"
+        </div>
+      </div>
+
+      <!-- Card 5: Perfil Deportivo & Metas (Ficha de Ingreso) -->
+      <div v-if="student.onboarding" class="md:col-span-2 bg-white rounded-[10px] border border-[#E2DFD8] p-6 shadow-2xs space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <Activity class="w-5 h-5 text-[#CEA549]" />
+            <h3 class="text-[16px] font-bold text-[#191A1D]">Perfil Deportivo y Metas (Ficha de Ingreso)</h3>
+          </div>
+          <span
+            v-if="student.onboarding?.consentAccepted"
+            class="px-2.5 py-0.5 rounded text-[11px] font-bold bg-[#E6F4EA] text-[#137333] border border-[#137333]/20 flex items-center gap-1"
           >
-            + Nueva evaluación
-          </button>
+            <Check class="w-3.5 h-3.5" /> Ficha & Consentimiento Oficial
+          </span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+          <div class="p-3 bg-[#FAF9F6] rounded-lg border border-[#ECE8E1]">
+            <span class="text-[#6B6D74] uppercase text-[10px] font-bold block mb-1">Objetivo Principal</span>
+            <span class="font-bold text-[#191A1D] text-sm">{{ student.onboarding.primaryGoal || 'Salud y Longevidad' }}</span>
+          </div>
+
+          <div class="p-3 bg-[#FAF9F6] rounded-lg border border-[#ECE8E1]">
+            <span class="text-[#6B6D74] uppercase text-[10px] font-bold block mb-1">Experiencia en Pesas</span>
+            <span class="font-bold text-[#191A1D] text-sm">{{ student.onboarding.trainingExperience || 'Sin especificar' }}</span>
+          </div>
+
+          <div class="p-3 bg-[#FAF9F6] rounded-lg border border-[#ECE8E1]">
+            <span class="text-[#6B6D74] uppercase text-[10px] font-bold block mb-1">Deportes Practicados</span>
+            <span class="font-bold text-[#191A1D] text-sm">{{ student.onboarding.sportsPracticed || 'Ninguno informado' }}</span>
+          </div>
+
+          <div v-if="student.onboarding.goalDetails" class="sm:col-span-3 p-3 bg-[#FAF9F6] rounded-lg border border-[#ECE8E1]">
+            <span class="text-[#6B6D74] uppercase text-[10px] font-bold block mb-1">Detalle de Metas Declaradas por el Alumno</span>
+            <p class="text-[#191A1D] text-xs leading-relaxed italic">"{{ student.onboarding.goalDetails }}"</p>
+          </div>
         </div>
       </div>
     </div>
@@ -628,6 +680,97 @@ async function toggleContractStatus() {
           </button>
         </div>
       </form>
+
+      <!-- Detailed 20 questions from Onboarding (Pablo's forms.app / Auto-ingreso) -->
+      <div v-if="student.onboarding" class="mt-8 pt-6 border-t border-[#ECE8E1] space-y-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h4 class="text-[15px] font-bold text-[#191A1D] flex items-center gap-2">
+              <FileCheck2 class="w-4 h-4 text-[#CEA549]" />
+              Expediente Oficial de Ingreso (20 Preguntas)
+            </h4>
+            <p class="text-xs text-[#6B6D74] mt-0.5">
+              Respuestas originales completadas por el alumno en su auto-ingreso.
+            </p>
+          </div>
+          <span class="text-xs text-[#8C6B1B] font-semibold bg-[#FAF9F6] px-2.5 py-1 rounded border border-[#ECE8E1]">
+            v1.0 Oficial
+          </span>
+        </div>
+
+        <!-- Bloque 1: Demográficos -->
+        <div class="space-y-3">
+          <p class="text-xs font-bold text-[#8C6B1B] uppercase tracking-wider">1. Datos Personales y Demográficos</p>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div class="p-2.5 bg-[#FAF9F6] rounded border border-[#ECE8E1]">
+              <span class="text-[#8E9097] text-[10px] uppercase font-bold block">RUT</span>
+              <span class="font-bold text-[#191A1D]">{{ student.onboarding.rut || 'No informado' }}</span>
+            </div>
+            <div class="p-2.5 bg-[#FAF9F6] rounded border border-[#ECE8E1]">
+              <span class="text-[#8E9097] text-[10px] uppercase font-bold block">Nacimiento / Edad</span>
+              <span class="font-bold text-[#191A1D]">{{ student.onboarding.birthDate || '—' }} ({{ student.onboarding.age || '—' }} años)</span>
+            </div>
+            <div class="p-2.5 bg-[#FAF9F6] rounded border border-[#ECE8E1]">
+              <span class="text-[#8E9097] text-[10px] uppercase font-bold block">Género</span>
+              <span class="font-bold text-[#191A1D]">{{ student.onboarding.gender || 'No informado' }}</span>
+            </div>
+            <div class="p-2.5 bg-[#FAF9F6] rounded border border-[#ECE8E1]">
+              <span class="text-[#8E9097] text-[10px] uppercase font-bold block">Comuna</span>
+              <span class="font-bold text-[#191A1D]">{{ student.onboarding.comuna || 'No informada' }}</span>
+            </div>
+            <div class="p-2.5 bg-[#FAF9F6] rounded border border-[#ECE8E1]">
+              <span class="text-[#8E9097] text-[10px] uppercase font-bold block">Ocupación</span>
+              <span class="font-bold text-[#191A1D]">{{ student.onboarding.occupation || 'No informada' }}</span>
+            </div>
+            <div class="p-2.5 bg-[#FAF9F6] rounded border border-[#ECE8E1]">
+              <span class="text-[#8E9097] text-[10px] uppercase font-bold block">¿Hijos?</span>
+              <span class="font-bold text-[#191A1D]">{{ student.onboarding.hasChildren === 'Si' ? `Sí (${student.onboarding.childrenCount || 1})` : 'No' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bloque 2: Ficha Clínica y Médica (PAR-Q+) -->
+        <div class="space-y-3">
+          <p class="text-xs font-bold text-rose-700 uppercase tracking-wider flex items-center gap-1.5">
+            <Heart class="w-3.5 h-3.5 text-rose-600" />
+            2. Cuestionario Clínico y Antecedentes Médicos (PAR-Q+)
+          </p>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div class="p-3 bg-[#FAF9F6] rounded border border-[#ECE8E1]">
+              <span class="text-[#8E9097] text-[10px] uppercase font-bold block mb-0.5">Enfermedades Crónicas</span>
+              <span class="font-medium text-[#191A1D]">{{ student.onboarding.chronicDiseases || 'Ninguna' }}</span>
+            </div>
+
+            <div class="p-3 bg-[#FAF9F6] rounded border border-[#ECE8E1]">
+              <span class="text-[#8E9097] text-[10px] uppercase font-bold block mb-0.5">Operaciones / Lesiones y Fechas</span>
+              <span class="font-medium text-[#191A1D]">{{ student.onboarding.surgeriesInjuries || 'Ninguna' }}</span>
+            </div>
+
+            <div class="p-3 bg-[#FAF9F6] rounded border border-[#ECE8E1]">
+              <span class="text-[#8E9097] text-[10px] uppercase font-bold block mb-0.5">¿Molestias o dolor actual?</span>
+              <span class="font-medium text-[#191A1D]">{{ student.onboarding.injuriesPreventExercise === 'Si' ? 'Sí, presenta dolor/limitación' : 'No' }}</span>
+            </div>
+
+            <div class="p-3 bg-[#FAF9F6] rounded border border-[#ECE8E1]">
+              <span class="text-[#8E9097] text-[10px] uppercase font-bold block mb-0.5">Dificultades para comenzar</span>
+              <span class="font-medium text-[#191A1D]">{{ student.onboarding.currentDifficulties || 'Ninguna' }}</span>
+            </div>
+
+            <div class="p-3 bg-[#FAF9F6] rounded border border-[#ECE8E1]">
+              <span class="text-[#8E9097] text-[10px] uppercase font-bold block mb-0.5">Antecedente COVID-19 & Secuelas</span>
+              <span class="font-medium text-[#191A1D]">
+                {{ student.onboarding.hadCovid === 'Si' ? `Sí (Secuelas: ${student.onboarding.covidSequelae || 'Ninguna'})` : 'No' }}
+              </span>
+            </div>
+
+            <div class="p-3 bg-[#FAF9F6] rounded border border-[#ECE8E1]">
+              <span class="text-[#8E9097] text-[10px] uppercase font-bold block mb-0.5">Consumo frecuente / Hábitos</span>
+              <span class="font-medium text-[#191A1D]">{{ student.onboarding.frequentConsumption || 'Ninguno informado' }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- TAB 3: PAGOS -->
@@ -687,59 +830,14 @@ async function toggleContractStatus() {
       </div>
     </div>
 
-    <!-- TAB 4: EVALUACIONES -->
-    <div v-else-if="currentTab === 'evaluaciones'" class="space-y-4">
-      <div class="bg-white rounded-[10px] border border-[#E2DFD8] p-6 shadow-2xs">
-        <div class="flex items-center justify-between mb-4">
-          <div>
-            <h3 class="text-[16px] font-bold text-[#191A1D]">Evaluaciones Físicas y Seguimiento</h3>
-            <p class="text-xs text-[#6B6D74]">Resultados de test, mediciones y observaciones periódicas.</p>
-          </div>
-          <button
-            @click="showEvalModal = true"
-            class="px-4 py-2 bg-[#CEA549] text-[#0B0B0D] text-xs font-bold rounded hover:bg-[#BA923B] transition-colors cursor-pointer shadow-xs"
-          >
-            + Nueva evaluación
-          </button>
-        </div>
-
-        <div v-if="studentEvaluations.length === 0" class="text-center py-10 text-sm text-[#8E9097]">
-          No hay evaluaciones registradas para este alumno.
-        </div>
-
-        <div v-else class="space-y-4">
-          <div
-            v-for="ev in studentEvaluations"
-            :key="ev.id"
-            class="p-4 border border-[#E2DFD8] rounded-lg hover:border-[#CEA549]/60 transition-colors bg-white space-y-3"
-          >
-            <div class="flex items-center justify-between border-b pb-2 border-[#ECE8E1]">
-              <div>
-                <span class="font-bold text-sm text-[#191A1D]">{{ ev.type }}</span>
-                <span class="text-xs text-[#6B6D74] ml-2">· {{ ev.date }}</span>
-              </div>
-              <span class="px-2 py-0.5 text-xs rounded bg-[#FAF9F6] border border-[#E2DFD8] text-[#191A1D] font-semibold">
-                {{ ev.status }}
-              </span>
-            </div>
-
-            <div v-if="ev.metrics && ev.metrics.length > 0" class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <div
-                v-for="(m, mi) in ev.metrics"
-                :key="mi"
-                class="p-2 bg-[#FAF9F6] rounded border border-[#ECE8E1] text-xs"
-              >
-                <p class="text-[#8E9097] text-[10px] uppercase font-bold">{{ m.name }}</p>
-                <p class="text-[#191A1D] font-bold mt-0.5">{{ m.value }} {{ m.unit || '' }}</p>
-              </div>
-            </div>
-
-            <p class="text-xs text-[#6B6D74] bg-[#FAF9F6] p-2.5 rounded border border-[#ECE8E1] italic">
-              "{{ ev.observations || 'Sin observaciones registradas' }}"
-            </p>
-          </div>
-        </div>
-      </div>
+    <!-- TAB 4: EVALUACIONES (EVALUACIÓN CIENTÍFICA OFICIAL INVERFIT) -->
+    <div v-else-if="currentTab === 'evaluaciones'" class="space-y-6">
+      <PabloEvaluationWorkbook
+        v-if="student"
+        :student-id="student.id"
+        :initial-student="student"
+        @saved="onEvaluationSaved"
+      />
     </div>
 
     <!-- TAB 5: CONTRATO -->
@@ -754,7 +852,7 @@ async function toggleContractStatus() {
           class="px-3.5 py-1.5 rounded text-xs font-bold transition-colors cursor-pointer"
           :class="studentContract?.status === 'Aceptado' ? 'bg-[#FEF7E0] text-[#B06000] hover:bg-[#FEEFC3]' : 'bg-[#E6F4EA] text-[#137333] hover:bg-[#CEEAD6]'"
         >
-          {{ studentContract?.status === 'Aceptado' ? 'Marcar como pendiente' : 'Marcar como aceptado (Demo)' }}
+          {{ studentContract?.status === 'Aceptado' ? 'Marcar como pendiente' : 'Marcar como aceptado' }}
         </button>
       </div>
 
@@ -775,20 +873,48 @@ async function toggleContractStatus() {
         </div>
       </div>
 
+      <!-- Digital Signature Box if signed via Public Onboarding -->
+      <div v-if="student.onboarding?.digitalSignature" class="p-5 bg-white rounded-xl border-2 border-[#CEA549]/40 shadow-xs space-y-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <ShieldCheck class="w-5 h-5 text-[#CEA549]" />
+            <h4 class="text-sm font-bold text-[#191A1D]">Firma Digital Táctil Registrada</h4>
+          </div>
+          <span class="px-2.5 py-0.5 rounded text-[11px] font-bold bg-[#E6F4EA] text-[#137333] border border-[#137333]/20 flex items-center gap-1">
+            <Check class="w-3.5 h-3.5" /> Aceptado & Firmado Digitalmente
+          </span>
+        </div>
+
+        <div class="p-3 bg-[#FAF9F6] rounded-lg border border-[#DCD8CF] inline-block">
+          <img
+            :src="student.onboarding.digitalSignature"
+            alt="Firma digital del alumno"
+            class="max-h-28 object-contain"
+          />
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-[#6B6D74] pt-1">
+          <p>
+            <strong class="text-[#191A1D]">Fecha y hora de firma:</strong>
+            {{ student.onboarding.consentTimestamp }}
+          </p>
+          <p>
+            <strong class="text-[#191A1D]">Versión de términos:</strong>
+            {{ student.onboarding.termsVersion || 'v1.0 (Oficial Pablo)' }}
+          </p>
+          <p class="sm:col-span-2 text-[11px] text-[#137333] font-medium">
+            ✓ Cláusulas aceptadas: Declaración jurada de salud, asunción de riesgos, política de pagos (del 1 al 5) y cupos de 75 min.
+          </p>
+        </div>
+      </div>
+
       <div class="p-4 bg-[#FAF9F6] rounded-lg border border-[#E2DFD8] text-xs text-[#191A1D] font-mono leading-relaxed max-h-60 overflow-y-auto whitespace-pre-wrap">
 CONTRATO DE ADHESIÓN Y CONSENTIMIENTO DE ENTRENAMIENTO — INVERFIT
 Alumno: {{ student.fullName }}
-Plan: {{ student.planName }} ({{ student.frequency }})
+Plan: {{ student.frequency }}
 Horario acordado: {{ studentAssignedSchedule }}
 
 El alumno declara encontrarse en condiciones físicas para participar en sesiones de fuerza y acondicionamiento. Acepta que los cambios de horario dependen de la disponibilidad del coach dentro de la misma semana y que las inasistencias sin aviso previo no aplazan la mensualidad.
-      </div>
-
-      <div class="p-3 bg-[#FEF7E0] border border-[#F0D878] rounded text-xs text-[#8C6B1B] flex items-start gap-2">
-        <AlertCircle class="w-4 h-4 flex-shrink-0 mt-0.5 text-[#B06000]" />
-        <span>
-          Aviso: Este mecanismo de aceptación es una demostración técnica para validar la visualización del estado documental. No constituye firma electrónica legal.
-        </span>
       </div>
     </div>
 
@@ -797,7 +923,11 @@ El alumno declara encontrarse en condiciones físicas para participar en sesione
       :open="showLinkModal"
       mode="link"
       :student-name="student.fullName"
+      :student-email="student.email"
+      :student-phone="student.phone"
       :link-url="generatedLink"
+      :frequency="student.frequency"
+      :due-date="student.membershipDueDate"
       @close="showLinkModal = false"
     />
 
@@ -805,12 +935,6 @@ El alumno declara encontrarse en condiciones físicas para participar en sesione
       :open="showPaymentModal"
       :initial-student-id="student.id"
       @close="showPaymentModal = false"
-    />
-
-    <CreateEvaluationModal
-      :open="showEvalModal"
-      :initial-student-id="student.id"
-      @close="showEvalModal = false"
     />
   </div>
 </template>

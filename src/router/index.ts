@@ -52,6 +52,18 @@ const router = createRouter({
       meta: { title: 'Contratos y consentimientos' }
     },
     {
+      path: '/registro-alumno',
+      name: 'registro-alumno',
+      component: () => import('@/views/PublicOnboardingView.vue'),
+      meta: { title: 'Ficha de Ingreso y Consentimiento', public: true }
+    },
+    {
+      path: '/login',
+      name: 'login',
+      component: () => import('@/views/LoginView.vue'),
+      meta: { title: 'Acceso Coach Pablo', public: true }
+    },
+    {
       path: '/:pathMatch(.*)*',
       redirect: '/inicio'
     }
@@ -62,6 +74,18 @@ router.beforeEach((to, _from, next) => {
   if (to.meta?.title) {
     document.title = `${to.meta.title} | INVERFIT`
   }
+
+  const isPublic = !!to.meta?.public
+  const isAuth = typeof window !== 'undefined' && !!localStorage.getItem('inverfit_auth_user')
+
+  if (to.path === '/login' && isAuth) {
+    return next('/inicio')
+  }
+
+  if (!isPublic && !isAuth) {
+    return next({ path: '/login', query: to.path !== '/inicio' ? { redirect: to.fullPath } : undefined })
+  }
+
   next()
 })
 

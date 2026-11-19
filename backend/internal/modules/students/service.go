@@ -61,7 +61,7 @@ func (s *service) Create(ctx context.Context, req CreateStudentRequest) (*Studen
 
 	planName := strings.TrimSpace(req.PlanName)
 	if planName == "" {
-		planName = "Plan estándar"
+		planName = "Membresía Mensual"
 	}
 
 	fixedSchedule := strings.TrimSpace(req.FixedSchedule)
@@ -102,6 +102,22 @@ func (s *service) Create(ctx context.Context, req CreateStudentRequest) (*Studen
 		Notes:               strings.TrimSpace(req.Notes),
 		HealthConditions:    health,
 		EmergencyContact:    emergency,
+		Onboarding:          req.Onboarding,
+	}
+
+	if req.Onboarding != nil {
+		if health == "Sin observaciones de salud registradas" || health == "" {
+			var healthParts []string
+			if req.Onboarding.ChronicDiseases != "" && strings.ToLower(req.Onboarding.ChronicDiseases) != "no" && strings.ToLower(req.Onboarding.ChronicDiseases) != "ninguna" {
+				healthParts = append(healthParts, "Crónicas: "+req.Onboarding.ChronicDiseases)
+			}
+			if req.Onboarding.SurgeriesInjuries != "" && strings.ToLower(req.Onboarding.SurgeriesInjuries) != "no" && strings.ToLower(req.Onboarding.SurgeriesInjuries) != "ninguna" {
+				healthParts = append(healthParts, "Lesiones/Cirugías: "+req.Onboarding.SurgeriesInjuries)
+			}
+			if len(healthParts) > 0 {
+				student.HealthConditions = strings.Join(healthParts, " · ")
+			}
+		}
 	}
 
 	if err := s.repo.Create(ctx, student); err != nil {
@@ -220,6 +236,10 @@ func (s *service) Update(ctx context.Context, idStr string, req UpdateStudentReq
 
 	if req.EmergencyContact != nil {
 		student.EmergencyContact = strings.TrimSpace(*req.EmergencyContact)
+	}
+
+	if req.Onboarding != nil {
+		student.Onboarding = req.Onboarding
 	}
 
 	if err := s.repo.Update(ctx, student); err != nil {

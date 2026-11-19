@@ -55,6 +55,16 @@ export const useGymStore = defineStore('gym', () => {
   const paymentsError = ref<string | null>(null)
   const paymentsDataSource = computed(() => getPaymentsDataSource())
   const financialSummary = ref<FinancialSummary | null>(null)
+  const sumupPermanentLink = ref<string>(
+    localStorage.getItem('inverfit_sumup_permanent_link') || 'https://link.sumup.com/pay/inverfit'
+  )
+
+  function updateSumupPermanentLink(url: string) {
+    const trimmed = url.trim()
+    sumupPermanentLink.value = trimmed || 'https://link.sumup.com/pay/inverfit'
+    localStorage.setItem('inverfit_sumup_permanent_link', sumupPermanentLink.value)
+    showToast('Enlace permanente de SumUp actualizado correctamente.', 'success', 'Configuración SumUp')
+  }
 
   const schedule = ref<ScheduleBlock[]>([])
   const availability = ref<DayAvailability[]>([])
@@ -170,6 +180,7 @@ export const useGymStore = defineStore('gym', () => {
     try {
       const list = await studentService.getAll(filter)
       students.value = list
+      syncContractsWithStudents(list)
       return list
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al cargar alumnos'
@@ -181,6 +192,67 @@ export const useGymStore = defineStore('gym', () => {
     } finally {
       loadingStudents.value = false
     }
+  }
+
+  /**
+   * Sincroniza dinámicamente los consentimientos y contratos con los alumnos reales del gimnasio.
+   * Elimina cualquier alumno de prueba residual y asegura que cada alumno registrado tenga su contrato.
+   */
+  function syncContractsWithStudents(studentList: Student[]) {
+    if (!studentList || studentList.length === 0) return
+
+    const existingContracts = storage.getContracts().filter(c => !c.studentName.toLowerCase().includes('alumno de ejemplo'))
+    const syncedContracts: ContractConsent[] = []
+
+    for (const student of studentList) {
+      const existing = existingContracts.find(c =>
+        c.studentId === student.id ||
+        c.studentName.trim().toLowerCase() === student.fullName.trim().toLowerCase()
+      )
+
+      const isConsentGiven = !!student.onboarding?.consentAccepted
+      let consentDate = 'Por registrar'
+      if (student.onboarding?.consentTimestamp) {
+        consentDate = student.onboarding.consentTimestamp.includes(',')
+          ? student.onboarding.consentTimestamp.split(',')[0].trim()
+          : student.onboarding.consentTimestamp.split('T')[0]
+      } else if (isConsentGiven) {
+        consentDate = student.createdAt?.split('T')[0] || '2026-11-18'
+      }
+
+      if (existing) {
+        syncedContracts.push({
+          ...existing,
+          id: existing.id || `cnt-${student.id}`,
+          studentId: student.id,
+          studentName: student.fullName,
+          status: isConsentGiven ? 'Aceptado' : existing.status,
+          date: existing.status === 'Aceptado' && existing.date !== 'Por registrar' ? existing.date : consentDate,
+          termsVersion: student.onboarding?.termsVersion || existing.termsVersion || 'v1.0 (2026)',
+          signedCopyAvailable: isConsentGiven || existing.signedCopyAvailable || existing.status === 'Aceptado',
+          notes: student.onboarding?.digitalSignature
+            ? 'Consentimiento y reglamento firmado digitalmente en pantalla táctil durante onboarding.'
+            : (existing.notes || 'Consentimiento informado registrado en el sistema.')
+        })
+      } else {
+        syncedContracts.push({
+          id: `cnt-${student.id}`,
+          studentId: student.id,
+          studentName: student.fullName,
+          documentType: 'Consentimiento informado y reglamento',
+          status: isConsentGiven ? 'Aceptado' : 'Pendiente',
+          date: consentDate,
+          termsVersion: student.onboarding?.termsVersion || 'v1.0 (2026)',
+          signedCopyAvailable: isConsentGiven,
+          notes: student.onboarding?.digitalSignature
+            ? 'Consentimiento firmado digitalmente en pantalla táctil durante onboarding.'
+            : (isConsentGiven ? 'Consentimiento aceptado al registrarse.' : 'Pendiente de firma digital o aceptación formal.')
+        })
+      }
+    }
+
+    contracts.value = syncedContracts
+    storage.setContracts(syncedContracts)
   }
 
   // Subscribe to storage changes
@@ -257,6 +329,7 @@ export const useGymStore = defineStore('gym', () => {
       if (isStudentsApiMode()) {
         students.value = [student, ...students.value.filter(s => s.id !== student.id)]
       }
+      syncContractsWithStudents(students.value)
       showToast(`Alumno "${student.fullName}" registrado exitosamente.`, 'success', 'Registro completado')
       return student
     } catch (err: unknown) {
@@ -294,6 +367,7 @@ export const useGymStore = defineStore('gym', () => {
       if (isStudentsApiMode()) {
         students.value = students.value.filter(s => s.id !== id)
       }
+      syncContractsWithStudents(students.value)
       showToast(`Alumno "${student?.fullName || 'seleccionado'}" archivado exitosamente.`, 'info')
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al eliminar alumno'
@@ -320,7 +394,7 @@ export const useGymStore = defineStore('gym', () => {
   async function simulatePaymentLink(studentId: string, paymentId?: string) {
     try {
       const res = await paymentService.sendPaymentLinkSimulation(studentId, paymentId)
-      showToast(res.message, 'info', 'Simulación: Enlace Generado')
+      showToast(res.message, 'info', 'Link SumUp')
       return res
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al generar enlace'
@@ -335,7 +409,7 @@ export const useGymStore = defineStore('gym', () => {
       if (isPaymentsApiMode()) {
         await loadPayments()
       }
-      showToast(res.message, 'info', 'Simulación: Recordatorio')
+      showToast(res.message, 'info', 'Aviso de Cobro')
       return res
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al enviar recordatorio'
@@ -350,7 +424,7 @@ export const useGymStore = defineStore('gym', () => {
       if (isPaymentsApiMode()) {
         await loadPayments()
       }
-      showToast(res.message, 'success', 'Simulación: Comprobante')
+      showToast(res.message, 'success', 'Comprobante')
       return res
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al enviar comprobante'
@@ -514,7 +588,12 @@ export const useGymStore = defineStore('gym', () => {
 
   async function createEvaluation(dto: CreateEvaluationDTO) {
     try {
+      const student = students.value.find(s => s.id === dto.studentId)
+      if (student && !dto.studentName) {
+        dto.studentName = student.fullName
+      }
       const ev = await evaluationService.create(dto)
+      evaluations.value = [ev, ...evaluations.value.filter(e => e.id !== ev.id)]
       showToast(`Evaluación registrada para ${ev.studentName}.`, 'success', 'Evaluación Guardada')
       return ev
     } catch (err: unknown) {
@@ -527,6 +606,13 @@ export const useGymStore = defineStore('gym', () => {
   async function updateEvaluation(id: string, updates: Partial<Evaluation>) {
     try {
       const ev = await evaluationService.update(id, updates)
+      if (ev) {
+        const idx = evaluations.value.findIndex(e => e.id === id)
+        if (idx !== -1) {
+          evaluations.value[idx] = ev
+          evaluations.value = [...evaluations.value]
+        }
+      }
       showToast('Evaluación actualizada.', 'success')
       return ev
     } catch (err: unknown) {
@@ -539,6 +625,7 @@ export const useGymStore = defineStore('gym', () => {
   async function deleteEvaluation(id: string) {
     try {
       await evaluationService.delete(id)
+      evaluations.value = evaluations.value.filter(e => e.id !== id)
       showToast('Evaluación eliminada.', 'info')
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al eliminar evaluación'
@@ -550,6 +637,13 @@ export const useGymStore = defineStore('gym', () => {
   async function updateContractStatus(id: string, status: ContractStatus) {
     try {
       const c = await contractService.updateStatus(id, status)
+      if (c) {
+        const idx = contracts.value.findIndex(item => item.id === id)
+        if (idx !== -1) {
+          contracts.value[idx] = c
+          contracts.value = [...contracts.value]
+        }
+      }
       showToast(`Estado de contrato actualizado a "${status}" para ${c?.studentName}.`, 'success', 'Contratos')
       return c
     } catch (err: unknown) {
@@ -604,6 +698,8 @@ export const useGymStore = defineStore('gym', () => {
     paymentsDataSource,
     isPaymentsApiMode,
     financialSummary,
+    sumupPermanentLink,
+    updateSumupPermanentLink,
     loadPayments,
     schedule,
     availability,
@@ -657,6 +753,7 @@ export const useGymStore = defineStore('gym', () => {
     saveTerms,
     resetDemoData,
     reloadData,
-    loadStudents
+    loadStudents,
+    syncContractsWithStudents
   }
 })

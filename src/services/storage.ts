@@ -176,7 +176,15 @@ class LocalStorageService {
   }
 
   public getEvaluations(): Evaluation[] {
-    return this.get<Evaluation[]>(STORAGE_KEYS.EVALUATIONS, initialEvaluations)
+    const list = this.get<Evaluation[]>(STORAGE_KEYS.EVALUATIONS, initialEvaluations)
+    // Verify if default official evaluations are present; if not, merge them seamlessly
+    const hasNelson = list.some(e => e.studentId === '6afe0c22633d726169887111' || e.id === 'eval-nelson-official')
+    if (!hasNelson) {
+      const merged = [...initialEvaluations, ...list.filter(e => !initialEvaluations.some(init => init.id === e.id))]
+      this.setEvaluations(merged)
+      return merged
+    }
+    return list
   }
 
   public setEvaluations(evaluations: Evaluation[]) {
@@ -184,7 +192,15 @@ class LocalStorageService {
   }
 
   public getContracts(): ContractConsent[] {
-    return this.get<ContractConsent[]>(STORAGE_KEYS.CONTRACTS, initialContracts)
+    const list = this.get<ContractConsent[]>(STORAGE_KEYS.CONTRACTS, initialContracts)
+    const hasExample = list.some(c => c.studentName.toLowerCase().includes('alumno de ejemplo'))
+    if (hasExample) {
+      const filtered = list.filter(c => !c.studentName.toLowerCase().includes('alumno de ejemplo'))
+      const result = filtered.length > 0 ? filtered : initialContracts
+      this.setContracts(result)
+      return result
+    }
+    return list
   }
 
   public setContracts(contracts: ContractConsent[]) {

@@ -21,8 +21,9 @@ export interface ScheduleBlock {
   startTime: string // "HH:MM"
   endTime: string   // "HH:MM"
   durationMinutes: number
-  type: 'Sesión grupal' | 'Individual'
+  type: 'Sesión grupal' | 'Individual' | 'Evaluación'
   studentIds: string[]
+  maxCapacity?: number // default 3 en INVERFIT
   isRecurring?: boolean // default true
   notes?: string
 }
@@ -50,8 +51,9 @@ export interface SessionOccurrence {
   startTime: string
   endTime: string
   durationMinutes: number
-  type: 'Sesión grupal' | 'Individual'
+  type: 'Sesión grupal' | 'Individual' | 'Evaluación'
   studentIds: string[]
+  maxCapacity?: number // default 3
   isRecurring: boolean
   isException: boolean
   exceptionType?: 'rescheduled' | 'cancelled'
@@ -67,6 +69,8 @@ export interface AssignSessionDTO {
   startTime: string
   endTime: string
   durationMinutes?: number
+  type?: 'Sesión grupal' | 'Individual' | 'Evaluación'
+  maxCapacity?: number
   isRecurring?: boolean
   startDate?: string
   endDate?: string

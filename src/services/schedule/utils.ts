@@ -73,3 +73,49 @@ export function getWeekDates(weekOffset: number = 0, baseDate: Date = new Date()
 
   return result
 }
+
+// ==============================================================================
+// BLOQUES FIJOS Y CONFIGURACIÓN REAL DE PABLO (INVERFIT)
+// ==============================================================================
+
+export interface FixedPresetBlock {
+  id: string
+  label: string
+  startTime: string
+  endTime: string
+  shift: 'mañana' | 'tarde'
+  isEvaluation?: boolean
+}
+
+/**
+ * Plantilla fija de turnos semanales de Pablo (Lunes a Viernes).
+ * Sesiones estructuradas de 75 minutos exactos según histórico oficial.
+ */
+export const PABLO_FIXED_PRESET_BLOCKS: FixedPresetBlock[] = [
+  { id: 'b-0630', label: '06:30 – 07:45', startTime: '06:30', endTime: '07:45', shift: 'mañana' },
+  { id: 'b-0800', label: '08:00 – 09:15', startTime: '08:00', endTime: '09:15', shift: 'mañana' },
+  { id: 'b-0930', label: '09:30 – 10:45', startTime: '09:30', endTime: '10:45', shift: 'mañana' },
+  { id: 'b-1100', label: '11:00 – 12:15', startTime: '11:00', endTime: '12:15', shift: 'mañana' },
+  { id: 'b-1400', label: '14:00 – 15:15', startTime: '14:00', endTime: '15:15', shift: 'tarde' },
+  { id: 'b-1600', label: '16:00 – 17:15', startTime: '16:00', endTime: '17:15', shift: 'tarde' },
+  { id: 'b-1730', label: '17:30 – 18:45', startTime: '17:30', endTime: '18:45', shift: 'tarde' },
+  { id: 'b-1900', label: '19:00 – 20:15', startTime: '19:00', endTime: '20:15', shift: 'tarde' },
+  { id: 'b-2030', label: '20:30 – 21:45', startTime: '20:30', endTime: '21:45', shift: 'tarde' }
+]
+
+/**
+ * Franjas exclusivas de Sábado reservadas para EVALUACIONES físicas y deportivas.
+ */
+export const PABLO_SATURDAY_EVALUATION_BLOCKS: FixedPresetBlock[] = [
+  { id: 'eval-0630', label: '06:30 – 07:45 (Evaluación)', startTime: '06:30', endTime: '07:45', shift: 'mañana', isEvaluation: true },
+  { id: 'eval-0800', label: '08:00 – 09:15 (Evaluación)', startTime: '08:00', endTime: '09:15', shift: 'mañana', isEvaluation: true },
+  { id: 'eval-0930', label: '09:30 – 10:45 (Evaluación)', startTime: '09:30', endTime: '10:45', shift: 'mañana', isEvaluation: true },
+  { id: 'eval-1100', label: '11:00 – 12:15 (Evaluación)', startTime: '11:00', endTime: '12:15', shift: 'mañana', isEvaluation: true }
+]
+
+/**
+ * Límite estricto de alumnos por bloque en INVERFIT.
+ * Permite control personalizado de técnica, cargas y seguridad.
+ */
+export const INVERFIT_MAX_STUDENTS_PER_BLOCK = 3
+

@@ -386,7 +386,9 @@ func (s *service) CreateSession(ctx context.Context, req CreateSessionRequest) (
 	}
 
 	sessionType := SessionTypeIndividual
-	if len(studentOIDs) > 1 {
+	if req.Type != nil && *req.Type != "" {
+		sessionType = *req.Type
+	} else if len(studentOIDs) > 1 {
 		sessionType = SessionTypeGroup
 	}
 
@@ -565,7 +567,9 @@ func (s *service) UpdateSession(ctx context.Context, idStr string, req UpdateSes
 	}
 
 	sessionType := SessionTypeIndividual
-	if len(studentOIDs) > 1 {
+	if req.Type != nil && *req.Type != "" {
+		sessionType = *req.Type
+	} else if len(studentOIDs) > 1 {
 		sessionType = SessionTypeGroup
 	}
 
@@ -1067,6 +1071,10 @@ func (s *service) validateStudents(ctx context.Context, studentIDs []string) ([]
 			return nil, nil, fmt.Errorf("%w: identificador de alumno inválido '%s'", ErrStudentNotFoundOrArchived, trimmed)
 		}
 		oids = append(oids, oid)
+	}
+
+	if len(oids) > 3 {
+		return nil, nil, fmt.Errorf("el cupo máximo por bloque en INVERFIT es de 3 alumnos (seleccionados: %d)", len(oids))
 	}
 
 	var summaries []StudentSummary

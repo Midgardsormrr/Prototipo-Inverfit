@@ -147,11 +147,13 @@ export class ScheduleApiService {
 
     try {
       if (dto.blockId) {
+        const sessionType = dto.type || (dto.day === 'Sáb' ? 'Evaluación' : (dto.studentIds.length > 1 ? 'Sesión grupal' : 'Individual'))
         // Update existing session
         const updated = await httpClient.put<ScheduleBlock>(`/schedule/sessions/${encodeURIComponent(dto.blockId)}`, {
           day: dto.day,
           startTime: dto.startTime,
           endTime: endTime,
+          type: sessionType,
           studentIds: dto.studentIds,
           isRecurring: dto.isRecurring !== false,
           startDate: dto.startDate,
@@ -164,12 +166,14 @@ export class ScheduleApiService {
           block: updated
         }
       } else {
+        const sessionType = dto.type || (dto.day === 'Sáb' ? 'Evaluación' : (dto.studentIds.length > 1 ? 'Sesión grupal' : 'Individual'))
         // Create new session
         const created = await httpClient.post<ScheduleBlock>('/schedule/sessions', {
           day: dto.day,
           startTime: dto.startTime,
           endTime: endTime,
           durationMinutes: durationMinutes,
+          type: sessionType,
           studentIds: dto.studentIds,
           isRecurring: dto.isRecurring !== false,
           startDate: dto.startDate,

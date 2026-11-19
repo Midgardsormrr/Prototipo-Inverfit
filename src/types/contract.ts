@@ -1,4 +1,4 @@
-export type DocumentType = 'Términos y condiciones' | 'Consentimiento informado' | 'Contrato de servicios'
+export type DocumentType = 'Términos y condiciones' | 'Consentimiento informado' | 'Contrato de servicios' | 'Consentimiento informado y reglamento'
 export type ContractStatus = 'Aceptado' | 'Pendiente'
 
 export interface ContractConsent {

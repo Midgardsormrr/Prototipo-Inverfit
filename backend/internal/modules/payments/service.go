@@ -68,7 +68,7 @@ func (s *service) RegisterPayment(ctx context.Context, req RegisterPaymentReques
 		student = &StudentInfo{
 			ID:               req.StudentID,
 			FullName:         "Alumno",
-			PlanName:         "Plan estándar",
+			PlanName:         "Membresía Mensual",
 			Frequency:        "2 veces/sem.",
 			MembershipStatus: "Activo",
 		}

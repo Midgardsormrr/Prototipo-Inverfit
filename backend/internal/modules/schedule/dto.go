@@ -32,6 +32,7 @@ type CreateSessionRequest struct {
 	StartTime       string   `json:"startTime" binding:"required"`
 	EndTime         string   `json:"endTime" binding:"required"`
 	DurationMinutes *int     `json:"durationMinutes,omitempty"`
+	Type            *string  `json:"type,omitempty"`
 	StudentIDs      []string `json:"studentIds"`
 	IsRecurring     *bool    `json:"isRecurring,omitempty"`
 	StartDate       string   `json:"startDate,omitempty"`
@@ -44,6 +45,7 @@ type UpdateSessionRequest struct {
 	Day         *string   `json:"day,omitempty"`
 	StartTime   *string   `json:"startTime,omitempty"`
 	EndTime     *string   `json:"endTime,omitempty"`
+	Type        *string   `json:"type,omitempty"`
 	StudentIDs  *[]string `json:"studentIds,omitempty"`
 	IsRecurring *bool     `json:"isRecurring,omitempty"`
 	StartDate   *string   `json:"startDate,omitempty"`

@@ -19,7 +19,7 @@ export class EvaluationService {
   async create(dto: CreateEvaluationDTO): Promise<Evaluation> {
     const list = storage.getEvaluations()
     const student = storage.getStudents().find(s => s.id === dto.studentId)
-    const studentName = student ? student.fullName : 'Alumno no especificado'
+    const studentName = dto.studentName || (student ? student.fullName : 'Alumno no especificado')
 
     const newEval: Evaluation = {
       id: `eval-${Date.now().toString().slice(-6)}`,
@@ -28,10 +28,21 @@ export class EvaluationService {
       date: dto.date || new Date().toISOString().split('T')[0],
       type: dto.type,
       status: dto.status || 'Registrada',
+      protocol: dto.protocol,
+      vitalSigns: dto.vitalSigns,
+      anthropometry: dto.anthropometry,
+      dynamometry: dto.dynamometry,
+      romPatterns: dto.romPatterns,
+      isometricStrength: dto.isometricStrength,
+      boscoJump: dto.boscoJump,
+      seniorFitness: dto.seniorFitness,
+      velocityEncoder: dto.velocityEncoder,
+      clinicalAlert: dto.clinicalAlert,
       metrics: dto.metrics || [],
       observations: dto.observations || '',
-      conductedBy: 'Pablo',
-      createdAt: new Date().toISOString().split('T')[0]
+      conductedBy: dto.conductedBy || 'Pablo',
+      createdAt: new Date().toISOString().split('T')[0],
+      workbookData: dto.workbookData
     }
 
     storage.setEvaluations([newEval, ...list])

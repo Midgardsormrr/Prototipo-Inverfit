@@ -16,12 +16,16 @@ const (
 
 // Allowed payment methods
 const (
-	MethodTransfer  = "Transferencia"
-	MethodWebpay    = "Webpay"
-	MethodServipag  = "Servipag"
-	MethodCredit    = "Crédito"
-	MethodDebit     = "Débito"
-	MethodUndefined = "Por definir"
+	MethodSumUpLink    = "SumUp (Link de pago)"
+	MethodSumUpPOS     = "SumUp (POS Tarjeta)"
+	MethodTransferBank = "Transferencia Bancaria"
+	MethodCash         = "Efectivo"
+	MethodTransfer     = "Transferencia"
+	MethodWebpay       = "Webpay"
+	MethodServipag     = "Servipag"
+	MethodCredit       = "Crédito"
+	MethodDebit        = "Débito"
+	MethodUndefined    = "Por definir"
 )
 
 // IsValidStatus checks whether a status string is valid.
@@ -37,7 +41,7 @@ func IsValidStatus(status string) bool {
 // IsValidPaymentMethod checks whether a payment method string is supported.
 func IsValidPaymentMethod(method string) bool {
 	switch method {
-	case MethodTransfer, MethodWebpay, MethodServipag, MethodCredit, MethodDebit, MethodUndefined:
+	case MethodSumUpLink, MethodSumUpPOS, MethodTransferBank, MethodCash, MethodTransfer, MethodWebpay, MethodServipag, MethodCredit, MethodDebit, MethodUndefined:
 		return true
 	default:
 		return false

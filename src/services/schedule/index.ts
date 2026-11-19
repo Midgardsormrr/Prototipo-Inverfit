@@ -10,15 +10,7 @@ import type {
 } from '@/types'
 import { scheduleMockService, ScheduleMockService } from './schedule.mock'
 import { scheduleApiService, ScheduleApiService } from './schedule.api'
-import {
-  timeToMinutes,
-  minutesToTime,
-  addMinutesToTime,
-  formatDateISO,
-  DAY_NAMES,
-  getWeekDates,
-  type WeekDayInfo
-} from './utils'
+import type { WeekDayInfo } from './utils'
 
 export interface IScheduleService {
   getAvailability(): Promise<DayAvailability[]>
@@ -176,16 +168,10 @@ class ScheduleServiceDelegator implements IScheduleService {
 }
 
 export const scheduleService = new ScheduleServiceDelegator()
+export * from './utils'
 export {
   scheduleMockService,
   ScheduleMockService,
   scheduleApiService,
-  ScheduleApiService,
-  timeToMinutes,
-  minutesToTime,
-  addMinutesToTime,
-  formatDateISO,
-  DAY_NAMES,
-  getWeekDates,
-  type WeekDayInfo
+  ScheduleApiService
 }

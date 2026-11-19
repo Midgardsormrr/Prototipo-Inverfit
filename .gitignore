@@ -37,3 +37,6 @@ credentials.json
 backend/bin/
 backend/*.exe
 *.exe
+
+# Temporary scratch and debug scripts
+scratch/

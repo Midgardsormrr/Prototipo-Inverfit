@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Menu, HelpCircle, RotateCcw } from 'lucide-vue-next'
-import { useGymStore } from '@/stores/gym'
+import { useRouter } from 'vue-router'
+import { Menu, HelpCircle, LogOut, ExternalLink } from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/auth'
 import BrandLogo from '@/components/brand/BrandLogo.vue'
 
 defineProps<{
@@ -12,20 +13,22 @@ const emit = defineEmits<{
   (e: 'toggle-mobile'): void
 }>()
 
-const gymStore = useGymStore()
-const showHelpModal = ref(false)
+const router = useRouter()
+const authStore = useAuthStore()
 
-function handleResetDemo() {
-  if (confirm('¿Restablecer todos los datos de demostración a su estado inicial de Figma?')) {
-    gymStore.resetDemoData()
-  }
+const showHelpModal = ref(false)
+const showUserMenu = ref(false)
+
+function handleLogout() {
+  authStore.logout()
+  router.push('/login')
 }
 </script>
 
 <template>
   <header class="h-[70px] bg-white border-b border-[#E2DFD8] px-4 sm:px-6 flex items-center justify-between sticky top-0 z-30 shadow-2xs">
-    <!-- Left: Hamburger on mobile + Mobile Logo + Search Box -->
-    <div class="flex items-center gap-3 sm:gap-4 flex-1 max-w-[500px]">
+    <!-- Left: Hamburger on mobile + Mobile Logo + Clean Workspace Title -->
+    <div class="flex items-center gap-3 sm:gap-4">
       <button
         @click="emit('toggle-mobile')"
         class="md:hidden p-2 text-[#191A1D] hover:bg-[#F5F3EE] rounded-md transition-colors"
@@ -39,49 +42,73 @@ function handleResetDemo() {
         <BrandLogo variant="light" :size="18" />
       </div>
 
-      <!-- Search input matching Figma wireframe -->
-      <div class="relative w-full max-w-[300px] hidden sm:block">
-        <input
-          v-model="gymStore.globalSearch"
-          type="text"
-          placeholder="⌕  Buscar alumno, bloque o pago..."
-          class="w-full h-[38px] px-3.5 bg-[#FAF9F6] border border-[#DCD8CF] rounded-[6px] text-[13px] text-[#191A1D] placeholder-[#8E9097] focus:outline-none focus:border-[#CEA549] focus:bg-white focus:ring-2 focus:ring-[#CEA549]/20 transition-all"
-        />
-        <button
-          v-if="gymStore.globalSearch"
-          @click="gymStore.globalSearch = ''"
-          class="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-[#8E9097] hover:text-[#191A1D]"
-        >
-          ✕
-        </button>
+      <!-- Desktop Status / Context Indicator -->
+      <div class="hidden sm:flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-[#FAF9F6] border border-[#E2DFD8] text-xs">
+        <span class="w-2 h-2 rounded-full bg-[#137333] shadow-xs"></span>
+        <span class="font-bold text-[#191A1D]">INVERFIT</span>
+        <span class="text-[#DCD8CF]">|</span>
+        <span class="text-[#6B6D74]">Sistema de Gestión Operativa</span>
       </div>
     </div>
 
-    <!-- Right: Reiniciar demo, Ayuda, Avatar -->
-    <div class="flex items-center gap-3 sm:gap-4">
-      <button
-        @click="handleResetDemo"
-        class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 text-[12px] font-medium text-[#6B6D74] bg-[#F5F3EE] hover:bg-[#EAE6DD] hover:text-[#191A1D] rounded-[6px] border border-[#DDD8CE] transition-colors cursor-pointer"
-        title="Restaurar datos de ejemplo del prototipo"
+    <!-- Right: Portal Alumnos, Ayuda, Coach Profile & Logout -->
+    <div class="flex items-center gap-3 sm:gap-4 relative">
+      <!-- Direct Link to Public Onboarding Portal -->
+      <router-link
+        to="/registro-alumno"
+        target="_blank"
+        class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#8C6B1B] hover:text-[#614910] hover:bg-[#FAF9F6] rounded-md border border-[#E2DFD8] transition-colors"
+        title="Abrir formulario de onboarding público para alumnos"
       >
-        <RotateCcw class="w-3.5 h-3.5 text-[#8E9097]" />
-        Reiniciar demo
-      </button>
+        <span>Portal Alumnos</span>
+        <ExternalLink class="w-3.5 h-3.5" />
+      </router-link>
 
+      <!-- Help Button -->
       <button
         @click="showHelpModal = true"
-        class="text-[13px] text-[#6B6D74] hover:text-[#191A1D] font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
+        class="text-[13px] text-[#6B6D74] hover:text-[#191A1D] font-medium transition-colors flex items-center gap-1.5 cursor-pointer py-1.5 px-2 rounded hover:bg-[#FAF9F6]"
       >
         <HelpCircle class="w-4 h-4 text-[#8E9097]" />
-        Ayuda
+        <span>Ayuda</span>
       </button>
 
-      <!-- Coach Avatar Circle matching Figma cx=1310, cy=35, r=18 with brand styling -->
-      <div
-        class="w-[36px] h-[36px] rounded-full bg-[#191A1D] border border-[#CEA549]/50 flex items-center justify-center text-[14px] font-bold text-[#CEA549] select-none cursor-pointer hover:border-[#CEA549] shadow-xs transition-colors"
-        title="Pablo — Entrenador (INVERFIT)"
-      >
-        P
+      <!-- Coach Avatar & Dropdown Trigger -->
+      <div class="relative">
+        <button
+          @click="showUserMenu = !showUserMenu"
+          class="flex items-center gap-2 pl-2 pr-1 py-1 rounded-full hover:bg-[#FAF9F6] transition-colors cursor-pointer border border-transparent hover:border-[#E2DFD8]"
+        >
+          <div
+            class="w-[36px] h-[36px] rounded-full bg-[#191A1D] border border-[#CEA549]/60 flex items-center justify-center text-[14px] font-bold text-[#CEA549] select-none shadow-xs"
+            title="Coach Pablo"
+          >
+            P
+          </div>
+          <span class="text-xs font-bold text-[#191A1D] hidden md:inline">Pablo</span>
+        </button>
+
+        <!-- Dropdown Menu -->
+        <div
+          v-if="showUserMenu"
+          class="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-[#E2DFD8] py-2 z-50 animate-in fade-in zoom-in-95 duration-100"
+          @click="showUserMenu = false"
+        >
+          <div class="px-4 py-2 border-b border-[#ECE8E1]">
+            <p class="text-xs font-bold text-[#191A1D]">Coach Pablo</p>
+            <p class="text-[11px] text-[#8E9097]">Entrenador Principal · INVERFIT</p>
+          </div>
+
+          <div class="py-1">
+            <button
+              @click="handleLogout"
+              class="w-full px-4 py-2 text-left text-xs text-[#D93025] hover:bg-[#FDF2F2] flex items-center gap-2 font-semibold transition-colors cursor-pointer"
+            >
+              <LogOut class="w-4 h-4" />
+              <span>Cerrar sesión</span>
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -95,32 +122,31 @@ function handleResetDemo() {
         <div class="flex items-center justify-between border-b pb-3 border-[#E2DFD8]">
           <div class="flex items-center gap-2">
             <BrandLogo variant="light" :size="20" />
-            <span class="text-xs font-semibold text-[#6B6D74] uppercase tracking-wider">· Guía</span>
+            <span class="text-xs font-semibold text-[#6B6D74] uppercase tracking-wider">· Guía Operativa INVERFIT</span>
           </div>
           <button @click="showHelpModal = false" class="text-[#8E9097] hover:text-[#191A1D] text-lg font-bold">✕</button>
         </div>
 
         <div class="space-y-3 text-sm text-[#4A4C52] leading-relaxed max-h-[60vh] overflow-y-auto pr-1">
           <p>
-            Bienvenido al panel administrativo de gestión de gimnasio para el entrenador de <strong>INVERFIT</strong>. Esta aplicación replica con fidelidad visual y funcional los 7 wireframes de Figma adaptados a la identidad corporativa.
+            Bienvenido al panel centralizado de administración de <strong>INVERFIT</strong> (v1.1). Este sistema permite al entrenador gestionar de forma integral toda la operación del centro deportivo.
           </p>
 
           <div class="bg-[#FAF9F6] p-3.5 rounded-lg border border-[#E2DFD8] space-y-2">
             <p class="font-semibold text-[#191A1D] flex items-center gap-1.5">
               <span class="w-2 h-2 rounded-full bg-[#CEA549]"></span>
-              Reglas operativas del negocio:
+              Reglas operativas oficiales:
             </p>
             <ul class="list-disc pl-5 space-y-1 text-xs text-[#555861]">
-              <li><strong>Agenda del coach:</strong> El agendamiento es administrado 100% por el entrenador en bloques fijos semanales (1 a 4 sesiones semanales).</li>
-              <li><strong>Disponibilidad y duración:</strong> Disponibilidad configurable por día. Sesiones de 75 minutos predeterminadas (libres y editables), sin descansos obligatorios.</li>
-              <li><strong>Horario operativo:</strong> 06:30 a 22:00.</li>
-              <li><strong>Simulaciones:</strong> El envío de enlaces de pago (<code class="bg-[#ECE8E1] px-1 py-0.5 rounded text-[11px]">https://demo.inverfit.invalid/checkout/...</code>), recordatorios por WhatsApp/correo y comprobantes son simulaciones funcionales con confirmaciones visuales.</li>
-              <li><strong>Persistencia:</strong> Todos los cambios se guardan localmente en localStorage. Puedes reiniciar la demostración en cualquier momento con el botón "Reiniciar demo".</li>
+              <li><strong>Agenda y Horarios:</strong> Bloques oficiales de 75 minutos (06:30 a 20:00 lun-vie) y evaluaciones sabatinas, con capacidad técnica máxima de 4 alumnos por turno.</li>
+              <li><strong>Membresías y Cobranza:</strong> Membresía mensual única con ciclo oficial del 1 al 5 de cada mes. Integración con enlace permanente de SumUp y registro de comprobantes con N° de operación.</li>
+              <li><strong>Evaluaciones Físicas:</strong> Sistema nativo de baremos M-F, monitoreo de signos vitales, dinamometría y percentiles.</li>
+              <li><strong>Contratos y Firmas:</strong> Registro de términos v1.0 y respaldo de firmas digitales táctiles capturadas desde el portal de onboarding.</li>
             </ul>
           </div>
 
           <p class="text-xs text-[#8E9097]">
-            * Se resguardan los datos mediante registros ficticios (Alumno de ejemplo 01 a 06).
+            * Para compartir el enlace de ingreso a nuevos alumnos, utiliza la opción <strong>Portal Alumnos</strong> en la barra superior.
           </p>
         </div>
 

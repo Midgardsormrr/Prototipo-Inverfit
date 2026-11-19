@@ -1,9 +1,19 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGymStore } from '@/stores/gym'
 import ManageTermsModal from '@/components/modals/ManageTermsModal.vue'
-import type { ContractConsent, ContractStatus } from '@/types'
+import type { ContractConsent, ContractStatus, Student } from '@/types'
+import {
+  FileText,
+  CheckCircle2,
+  Clock,
+  Printer,
+  Share2,
+  Check,
+  ShieldCheck,
+  AlertCircle
+} from 'lucide-vue-next'
 
 const router = useRouter()
 const gymStore = useGymStore()
@@ -11,10 +21,15 @@ const gymStore = useGymStore()
 const showManageTermsModal = ref(false)
 const showDocViewerModal = ref(false)
 const selectedContract = ref<ContractConsent | null>(null)
+const copiedContractId = ref<string | null>(null)
 
 const searchName = ref('')
 const selectedStatus = ref('')
 const selectedDocType = ref('')
+
+onMounted(async () => {
+  await gymStore.loadStudents()
+})
 
 const filteredContracts = computed(() => {
   return gymStore.contracts.filter(c => {
@@ -31,6 +46,15 @@ const currentVersion = computed(() => {
   return current ? current.version : 'v1.0 (2026)'
 })
 
+function getStudent(studentId: string): Student | undefined {
+  return gymStore.students.find(s => s.id === studentId)
+}
+
+const selectedStudent = computed(() => {
+  if (!selectedContract.value) return null
+  return gymStore.students.find(s => s.id === selectedContract.value!.studentId) || null
+})
+
 function viewContract(contract: ContractConsent) {
   selectedContract.value = contract
   showDocViewerModal.value = true
@@ -44,6 +68,25 @@ async function handleToggleStatus(contract: ContractConsent) {
   }
 }
 
+async function copyConsentLink(contract: ContractConsent) {
+  const url = `${window.location.origin}/registro-alumno`
+  const text = `Hola ${contract.studentName}! Te comparto el enlace para que firmes digitalmente tu Consentimiento Informado y Reglamento de INVERFIT desde tu celular:\n${url}`
+  try {
+    await navigator.clipboard.writeText(text)
+    copiedContractId.value = contract.id
+    gymStore.showToast(`Enlace para ${contract.studentName} copiado. ¡Pégalo en WhatsApp!`, 'success', 'Enlace copiado')
+    setTimeout(() => {
+      copiedContractId.value = null
+    }, 3000)
+  } catch {
+    gymStore.showToast(`Enlace: ${url}`, 'info')
+  }
+}
+
+function printContract() {
+  window.print()
+}
+
 function goToStudent(studentId: string) {
   router.push(`/alumnos/${studentId}`)
 }
@@ -51,55 +94,65 @@ function goToStudent(studentId: string) {
 
 <template>
   <div class="space-y-6 max-w-[1100px] mx-auto pb-10">
-    <!-- Header matching wireframe 07 -->
+    <!-- Header -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
         <h1 class="text-[26px] font-bold text-[#191A1D] tracking-tight">Contratos y consentimientos</h1>
-        <p class="text-[14px] text-[#6B6D74] mt-0.5">Controla documentos vigentes y aceptación de términos.</p>
+        <p class="text-[14px] text-[#6B6D74] mt-0.5">Controla documentos vigentes, firmas digitales y aceptación de términos de los alumnos.</p>
       </div>
 
       <button
         @click="showManageTermsModal = true"
         class="h-[40px] px-5 bg-[#CEA549] hover:bg-[#BA923B] text-[#0B0B0D] rounded-[6px] text-[14px] font-bold transition-all flex items-center justify-center gap-1.5 self-start sm:self-auto cursor-pointer shadow-xs hover:shadow"
       >
+        <FileText class="w-4 h-4" />
         Gestionar términos
       </button>
     </div>
 
-    <!-- 3 KPI Summary Cards matching wireframe 07: [x=278, y=193], [x=623, y=193], [x=968, y=193] -->
+    <!-- 3 KPI Summary Cards -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <!-- Card 1 -->
       <div class="relative bg-white rounded-[10px] border border-[#E2DFD8] p-4 flex flex-col justify-between shadow-2xs hover:border-[#CEA549]/60 transition-all group overflow-hidden">
         <div class="absolute top-0 left-0 right-0 h-[3px] bg-transparent group-hover:bg-[#CEA549] transition-colors"></div>
-        <span class="text-[13px] font-semibold text-[#6B6D74]">Pendientes de aceptación</span>
+        <div class="flex items-center justify-between">
+          <span class="text-[13px] font-semibold text-[#6B6D74]">Pendientes de aceptación</span>
+          <Clock class="w-4 h-4 text-[#B06000]" />
+        </div>
         <span class="text-[30px] font-bold text-[#191A1D] leading-tight my-1">
           {{ gymStore.pendingContractsCount }}
         </span>
-        <span class="text-[12px] text-[#8E9097]">Solicitudes por completar</span>
+        <span class="text-[12px] text-[#8E9097]">Alumnos por firmar consentimiento</span>
       </div>
 
       <!-- Card 2 -->
       <div class="relative bg-white rounded-[10px] border border-[#E2DFD8] p-4 flex flex-col justify-between shadow-2xs hover:border-[#CEA549]/60 transition-all group overflow-hidden">
         <div class="absolute top-0 left-0 right-0 h-[3px] bg-transparent group-hover:bg-[#CEA549] transition-colors"></div>
-        <span class="text-[13px] font-semibold text-[#6B6D74]">Aceptados</span>
+        <div class="flex items-center justify-between">
+          <span class="text-[13px] font-semibold text-[#6B6D74]">Aceptados y vigentes</span>
+          <CheckCircle2 class="w-4 h-4 text-[#137333]" />
+        </div>
         <span class="text-[30px] font-bold text-[#191A1D] leading-tight my-1">
           {{ gymStore.acceptedContractsCount }}
         </span>
-        <span class="text-[12px] text-[#8E9097]">Consentimientos registrados</span>
+        <span class="text-[12px] text-[#8E9097]">Consentimientos con respaldo activo</span>
       </div>
 
       <!-- Card 3 -->
       <div class="relative bg-white rounded-[10px] border border-[#E2DFD8] p-4 flex flex-col justify-between shadow-2xs hover:border-[#CEA549]/60 transition-all group overflow-hidden">
         <div class="absolute top-0 left-0 right-0 h-[3px] bg-transparent group-hover:bg-[#CEA549] transition-colors"></div>
-        <span class="text-[13px] font-semibold text-[#6B6D74]">Versión vigente</span>
-        <span class="text-[22px] font-bold text-[#191A1D] leading-tight truncate my-1">
+        <div class="flex items-center justify-between">
+          <span class="text-[13px] font-semibold text-[#6B6D74]">Versión vigente</span>
+          <ShieldCheck class="w-4 h-4 text-[#8C6B1B]" />
+        </div>
+        <span class="text-[20px] font-bold text-[#191A1D] leading-tight truncate my-1">
           {{ currentVersion }}
         </span>
-        <span class="text-[12px] text-[#8E9097]">Por confirmar con el cliente</span>
+        <span class="text-[12px] text-[#8E9097]">Reglamento oficial INVERFIT</span>
       </div>
     </div>
 
-    <!-- Toolbar: Search + Estado de aceptación + Tipo de documento matching wireframe -->
+    <!-- Toolbar: Search + Filtro Estado + Filtro Documento -->
     <div class="bg-white rounded-[10px] border border-[#E2DFD8] p-4 flex flex-col md:flex-row items-center justify-between gap-4 shadow-2xs">
       <div class="w-full md:w-[320px] relative">
         <input
@@ -117,7 +170,7 @@ function goToStudent(studentId: string) {
         </button>
       </div>
 
-      <div class="flex items-center gap-3 w-full md:w-auto justify-end">
+      <div class="flex items-center gap-3 w-full md:w-auto justify-end flex-wrap">
         <select
           v-model="selectedStatus"
           class="h-[40px] px-3 bg-[#FAF9F6] border border-[#DCD8CF] rounded-[6px] text-[13px] font-semibold text-[#191A1D] hover:bg-white focus:outline-none focus:border-[#CEA549] focus:ring-1 focus:ring-[#CEA549]/30 transition-all cursor-pointer"
@@ -132,17 +185,17 @@ function goToStudent(studentId: string) {
           class="h-[40px] px-3 bg-[#FAF9F6] border border-[#DCD8CF] rounded-[6px] text-[13px] font-semibold text-[#191A1D] hover:bg-white focus:outline-none focus:border-[#CEA549] focus:ring-1 focus:ring-[#CEA549]/30 transition-all cursor-pointer"
         >
           <option value="">Tipo de documento  ▾</option>
+          <option value="Consentimiento informado y reglamento">Consentimiento informado y reglamento</option>
           <option value="Términos y condiciones">Términos y condiciones</option>
           <option value="Consentimiento informado">Consentimiento informado</option>
-          <option value="Contrato de servicios">Contrato de servicios</option>
         </select>
       </div>
     </div>
 
-    <!-- Table matching wireframe 07: Alumno | Documento | Estado | Fecha | Acción -->
+    <!-- Table: Alumno | Documento | Estado | Fecha | Acción -->
     <div class="bg-white rounded-[10px] border border-[#E2DFD8] overflow-hidden shadow-2xs">
       <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse min-w-[750px]">
+        <table class="w-full text-left border-collapse min-w-[780px]">
           <thead>
             <tr class="border-b border-[#E2DFD8] bg-[#FAF9F6]">
               <th class="py-3 px-6 text-[12px] font-bold text-[#6B6D74] uppercase tracking-wider">
@@ -158,7 +211,7 @@ function goToStudent(studentId: string) {
                 Fecha
               </th>
               <th class="py-3 px-6 text-[12px] font-bold text-[#6B6D74] uppercase tracking-wider text-right">
-                Acción
+                Acciones
               </th>
             </tr>
           </thead>
@@ -166,7 +219,7 @@ function goToStudent(studentId: string) {
           <tbody class="divide-y divide-[#ECE8E1]">
             <tr v-if="filteredContracts.length === 0">
               <td colspan="5" class="py-12 text-center text-sm text-[#8E9097]">
-                No se encontraron contratos registrados.
+                No se encontraron consentimientos o contratos registrados.
               </td>
             </tr>
 
@@ -179,13 +232,22 @@ function goToStudent(studentId: string) {
               <!-- Alumno -->
               <td class="py-4 px-6 text-[13px] font-medium text-[#191A1D]">
                 <div class="flex items-center gap-3">
-                  <div class="w-8 h-8 rounded-full bg-[#191A1D] text-[#CEA549] border border-[#CEA549]/40 flex items-center justify-center text-[12px] font-bold">
+                  <div class="w-9 h-9 rounded-full bg-[#191A1D] text-[#CEA549] border border-[#CEA549]/40 flex items-center justify-center text-[13px] font-bold shrink-0">
                     {{ contract.studentName.charAt(0) }}
                   </div>
                   <div>
-                    <span class="group-hover:text-black font-bold text-[#191A1D]">{{ contract.studentName }}</span>
-                    <p class="text-[11px] text-[#8E9097] leading-none mt-0.5">
-                      Versión: {{ contract.termsVersion }}
+                    <div class="flex items-center gap-2">
+                      <span class="group-hover:text-black font-bold text-[#191A1D]">{{ contract.studentName }}</span>
+                      <span
+                        v-if="getStudent(contract.studentId)?.onboarding?.digitalSignature"
+                        class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-[#E6F4EA] text-[#137333] border border-[#137333]/20"
+                        title="Firma digital táctil registrada"
+                      >
+                        ✍️ Firma digital
+                      </span>
+                    </div>
+                    <p class="text-[11px] text-[#8E9097] leading-none mt-1">
+                      {{ getStudent(contract.studentId)?.email || 'Sin correo registrado' }}
                     </p>
                   </div>
                 </div>
@@ -193,38 +255,53 @@ function goToStudent(studentId: string) {
 
               <!-- Documento -->
               <td class="py-4 px-6 text-[13px] text-[#4A4C52]">
-                {{ contract.documentType }}
+                <p class="font-semibold text-[#191A1D]">{{ contract.documentType }}</p>
+                <p class="text-[11px] text-[#8E9097] mt-0.5">Versión: {{ contract.termsVersion }}</p>
               </td>
 
               <!-- Estado -->
               <td class="py-4 px-6 text-[13px]">
                 <span
-                  class="px-2.5 py-1 rounded-[4px] text-[12px] font-semibold inline-block"
+                  class="px-2.5 py-1 rounded-[4px] text-[12px] font-semibold inline-flex items-center gap-1.5"
                   :class="contract.status === 'Aceptado' ? 'bg-[#E6F4EA] text-[#137333]' : 'bg-[#FEF7E0] text-[#B06000]'"
                 >
+                  <span class="w-1.5 h-1.5 rounded-full" :class="contract.status === 'Aceptado' ? 'bg-[#137333]' : 'bg-[#B06000]'"></span>
                   {{ contract.status }}
                 </span>
               </td>
 
               <!-- Fecha -->
-              <td class="py-4 px-6 text-[13px] text-[#4A4C52]">
+              <td class="py-4 px-6 text-[13px] text-[#4A4C52] whitespace-nowrap">
                 {{ contract.date }}
               </td>
 
-              <!-- Acción -->
+              <!-- Acciones -->
               <td class="py-4 px-6 text-[13px] font-semibold text-right whitespace-nowrap" @click.stop>
-                <div class="flex items-center justify-end gap-3">
+                <div class="flex items-center justify-end gap-2">
+                  <!-- Botón WhatsApp para alumnos pendientes -->
                   <button
-                    @click="handleToggleStatus(contract)"
-                    class="text-xs px-2.5 py-1 rounded border border-[#DCD8CF] hover:bg-white font-semibold text-[#191A1D] transition-colors cursor-pointer"
-                    title="Simular cambio de estado de aceptación"
+                    v-if="contract.status === 'Pendiente'"
+                    @click="copyConsentLink(contract)"
+                    class="h-[30px] px-2.5 rounded border border-[#DCD8CF] hover:bg-white text-xs font-semibold text-[#191A1D] flex items-center gap-1.5 transition-colors cursor-pointer"
+                    title="Copiar enlace para WhatsApp del alumno"
                   >
-                    {{ contract.status === 'Aceptado' ? 'Marcar pendiente' : 'Aceptar (Demo)' }}
+                    <component :is="copiedContractId === contract.id ? Check : Share2" class="w-3.5 h-3.5" :class="copiedContractId === contract.id ? 'text-[#137333]' : 'text-[#8C6B1B]'" />
+                    <span>{{ copiedContractId === contract.id ? 'Copiado!' : 'Link WhatsApp' }}</span>
                   </button>
 
+                  <!-- Toggle Status Button -->
+                  <button
+                    @click="handleToggleStatus(contract)"
+                    class="h-[30px] px-2.5 rounded border border-[#DCD8CF] hover:bg-white text-xs font-semibold text-[#191A1D] transition-colors cursor-pointer"
+                    :title="contract.status === 'Aceptado' ? 'Marcar como pendiente' : 'Registrar aceptación presencial'"
+                  >
+                    {{ contract.status === 'Aceptado' ? 'Marcar pendiente' : 'Marcar aceptado' }}
+                  </button>
+
+                  <!-- Ver Documento -->
                   <button
                     @click="viewContract(contract)"
-                    class="text-[#8C6B1B] hover:text-[#614910] hover:underline cursor-pointer font-bold"
+                    class="h-[30px] px-3 bg-[#191A1D] hover:bg-[#2A2B2F] text-white rounded text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
                   >
                     Ver →
                   </button>
@@ -236,11 +313,14 @@ function goToStudent(studentId: string) {
       </div>
     </div>
 
-    <!-- Informational Card matching wireframe 07: [x=280, y=718] and [x=280, y=742] -->
-    <div class="bg-white rounded-[10px] border border-[#E2DFD8] p-6 shadow-2xs space-y-1">
-      <h3 class="text-[14px] font-bold text-[#191A1D]">Documento y respaldo</h3>
-      <p class="text-[12px] text-[#6B6D74]">
-        El mecanismo de firma, versionado y resguardo legal debe validarse antes de implementar. Esta sección es una simulación visual y documental de demostración.
+    <!-- Informational Card: Respaldo legal y consentimientos -->
+    <div class="bg-white rounded-[10px] border border-[#E2DFD8] p-6 shadow-2xs space-y-2">
+      <div class="flex items-center gap-2">
+        <ShieldCheck class="w-5 h-5 text-[#8C6B1B]" />
+        <h3 class="text-[14px] font-bold text-[#191A1D]">Respaldo legal y consentimientos informados</h3>
+      </div>
+      <p class="text-[12px] text-[#6B6D74] leading-relaxed">
+        Todos los términos, políticas de clase y declaraciones de salud son aceptados y firmados digitalmente por los alumnos durante su registro de onboarding, quedando debidamente archivados bajo la versión vigente del reglamento interno de INVERFIT. Si un alumno aún no firma, puedes compartirle el enlace de WhatsApp para que estampe su firma táctil desde su teléfono móvil.
       </p>
     </div>
 
@@ -256,20 +336,27 @@ function goToStudent(studentId: string) {
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs overflow-y-auto"
       @click.self="showDocViewerModal = false"
     >
-      <div class="bg-white rounded-xl shadow-2xl max-w-xl w-full border border-[#E2DFD8] overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-150">
+      <div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full border border-[#E2DFD8] overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-150">
+        <!-- Modal Top Bar -->
         <div class="px-6 py-4 border-b border-[#E2DFD8] flex items-center justify-between bg-[#FAF9F6]">
-          <div>
-            <div class="flex items-center gap-2">
-              <span
-                class="px-2 py-0.5 rounded text-[11px] font-bold"
-                :class="selectedContract.status === 'Aceptado' ? 'bg-[#E6F4EA] text-[#137333]' : 'bg-[#FEF7E0] text-[#B06000]'"
-              >
-                {{ selectedContract.status }}
-              </span>
-              <h2 class="text-base font-bold text-[#191A1D]">{{ selectedContract.documentType }}</h2>
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-[#191A1D] border border-[#CEA549]/40 flex items-center justify-center text-[#CEA549] font-black text-xs">
+              IN
             </div>
-            <p class="text-xs text-[#6B6D74] mt-0.5">Alumno: {{ selectedContract.studentName }} · Versión: {{ selectedContract.termsVersion }}</p>
+            <div>
+              <div class="flex items-center gap-2">
+                <span
+                  class="px-2 py-0.5 rounded text-[11px] font-bold"
+                  :class="selectedContract.status === 'Aceptado' ? 'bg-[#E6F4EA] text-[#137333]' : 'bg-[#FEF7E0] text-[#B06000]'"
+                >
+                  {{ selectedContract.status }}
+                </span>
+                <h2 class="text-base font-bold text-[#191A1D]">{{ selectedContract.documentType }}</h2>
+              </div>
+              <p class="text-xs text-[#6B6D74] mt-0.5">Versión oficial: {{ selectedContract.termsVersion }} · Fecha: {{ selectedContract.date }}</p>
+            </div>
           </div>
+
           <button
             @click="showDocViewerModal = false"
             class="text-[#8E9097] hover:text-[#191A1D] text-xl font-light w-8 h-8 rounded-full flex items-center justify-center hover:bg-[#F5F3EE] transition-colors"
@@ -278,26 +365,131 @@ function goToStudent(studentId: string) {
           </button>
         </div>
 
-        <div class="p-6 space-y-4 max-h-[65vh] overflow-y-auto text-xs text-[#191A1D] leading-relaxed font-mono bg-[#FAF9F6] border-y border-[#E2DFD8] whitespace-pre-wrap">
-CONTRATO Y TÉRMINOS DEL SERVICIO — INVERFIT
-Alumno: {{ selectedContract.studentName }}
-Estado de aceptación: {{ selectedContract.status }}
-Fecha de registro: {{ selectedContract.date }}
-
-1. DECLARACIÓN DE SALUD Y APTITUD
-El alumno declara encontrarse médicamente apto para el entrenamiento impartido en INVERFIT y exime al entrenador de responsabilidad por omisión de antecedentes médicos.
-
-2. CUMPLIMIENTO DE HORARIOS Y POLÍTICA DE CLASES
-Los cupos asignados en la agenda son fijos por semana. Las cancelaciones no aplazan la membresía salvo disponibilidad y coordinación directa con el entrenador en la misma semana.
+        <!-- Student Data Strip -->
+        <div class="px-6 py-3 bg-[#FAF9F6] border-b border-[#E2DFD8] grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+          <div>
+            <span class="text-[#8E9097] block text-[11px]">Alumno:</span>
+            <span class="font-bold text-[#191A1D]">{{ selectedContract.studentName }}</span>
+          </div>
+          <div>
+            <span class="text-[#8E9097] block text-[11px]">RUT / Identificación:</span>
+            <span class="font-semibold text-[#191A1D]">{{ selectedStudent?.onboarding?.rut || 'Sin registrar' }}</span>
+          </div>
+          <div>
+            <span class="text-[#8E9097] block text-[11px]">Teléfono:</span>
+            <span class="font-semibold text-[#191A1D]">{{ selectedStudent?.phone || 'Sin registrar' }}</span>
+          </div>
+          <div>
+            <span class="text-[#8E9097] block text-[11px]">Contacto de Emergencia:</span>
+            <span class="font-semibold text-[#191A1D] truncate block">{{ selectedStudent?.emergencyContact || 'Sin registrar' }}</span>
+          </div>
         </div>
 
-        <div class="p-4 bg-white flex items-center justify-between gap-3 border-t border-[#ECE8E1]">
-          <button
-            @click="goToStudent(selectedContract.studentId); showDocViewerModal = false"
-            class="text-xs text-[#8C6B1B] hover:text-[#614910] font-bold underline cursor-pointer"
+        <!-- Document Body -->
+        <div class="p-6 space-y-4 max-h-[55vh] overflow-y-auto text-xs text-[#191A1D] leading-relaxed bg-white font-sans">
+          <div class="border-b border-[#ECE8E1] pb-3 text-center">
+            <h3 class="text-sm font-bold uppercase tracking-wider text-[#191A1D]">
+              Consentimiento Informado, Declaración de Salud y Reglamento del Servicio
+            </h3>
+            <p class="text-[11px] text-[#6B6D74] mt-0.5">Centro de Entrenamiento Personalizado INVERFIT · Coach Pablo</p>
+          </div>
+
+          <div class="space-y-3 text-[12px] text-[#3A3B40]">
+            <div>
+              <p class="font-bold text-[#191A1D]">1. DECLARACIÓN DE SALUD Y APTITUD FÍSICA (PAR-Q+)</p>
+              <p class="mt-0.5 text-justify">
+                El alumno declara bajo fe de juramento encontrarse en condiciones médicas adecuadas para realizar actividad física progresiva y entrenamiento de fuerza. Declara haber informado con total veracidad antecedentes quirúrgicos, dolencias articulares o condiciones crónicas en su ficha de ingreso, eximiendo a INVERFIT y a su entrenador principal de cualquier responsabilidad derivada de la omisión o falsedad de antecedentes clínicos.
+              </p>
+            </div>
+
+            <div>
+              <p class="font-bold text-[#191A1D]">2. ORGANIZACIÓN EN BLOQUES FIJOS DE 75 MINUTOS</p>
+              <p class="mt-0.5 text-justify">
+                Las sesiones de entrenamiento se organizan en bloques fijos de 75 minutos con un aforo técnico riguroso de máximo 4 alumnos por bloque para garantizar atención personalizada. El alumno se compromete a asistir puntualmente. Las inasistencias no son acumulables ni aplazan el valor de la mensualidad, salvo aviso previo con al menos 24 horas y reasignación excepcional sujeta a cupos disponibles en la misma semana.
+              </p>
+            </div>
+
+            <div>
+              <p class="font-bold text-[#191A1D]">3. MEMBRESÍA MENSUAL Y CICLO DE RECAUDACIÓN (DEL 1 AL 5)</p>
+              <p class="mt-0.5 text-justify">
+                El servicio opera bajo una membresía mensual única con ciclo oficial de pago del 1 al 5 de cada mes calendario. Los pagos deben regularizarse a través del enlace permanente oficial de SumUp o transferencia bancaria acreditada con comprobante. El no pago dentro del plazo faculta a INVERFIT a liberar el cupo en el bloque horario.
+              </p>
+            </div>
+
+            <div>
+              <p class="font-bold text-[#191A1D]">4. RESGUARDO DE DATOS Y SEGUIMIENTO</p>
+              <p class="mt-0.5 text-justify">
+                El alumno autoriza el registro de sus evaluaciones físicas, percentiles y métricas corporales para fines exclusivos de monitoreo técnico, planificación de sobrecarga y resguardo deportivo confidencial.
+              </p>
+            </div>
+          </div>
+
+          <!-- Digital Signature Box -->
+          <div
+            v-if="selectedStudent?.onboarding?.digitalSignature"
+            class="mt-4 p-4 rounded-lg bg-[#FAF9F6] border-2 border-[#CEA549]/50 shadow-2xs space-y-2"
           >
-            Ir a la ficha del alumno →
-          </button>
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2 text-[#137333] font-bold text-xs">
+                <ShieldCheck class="w-4 h-4 text-[#137333]" />
+                <span>Firmado digitalmente vía Web Onboarding INVERFIT</span>
+              </div>
+              <span class="text-[11px] text-[#6B6D74]">{{ selectedStudent.onboarding.consentTimestamp }}</span>
+            </div>
+
+            <div class="p-2 bg-white rounded border border-[#E2DFD8] flex items-center justify-center">
+              <img
+                :src="selectedStudent.onboarding.digitalSignature"
+                alt="Firma digital del alumno"
+                class="max-h-24 object-contain"
+              />
+            </div>
+            <p class="text-[10px] text-[#8E9097] text-center">
+              Firma electrónica estampada en pantalla táctil con hash de registro y confirmación biométrica.
+            </p>
+          </div>
+
+          <!-- Unsigned Info Box -->
+          <div
+            v-else
+            class="mt-4 p-4 rounded-lg bg-[#FEF7E0]/60 border border-[#B06000]/30 space-y-2 text-xs"
+          >
+            <div class="flex items-center gap-2 text-[#B06000] font-bold">
+              <AlertCircle class="w-4 h-4" />
+              <span>Pendiente de firma digital táctil</span>
+            </div>
+            <p class="text-[#6B6D74]">
+              Este alumno no tiene una firma digital estampada en el portal. Puedes enviarle el enlace para que firme en su teléfono o marcar la aceptación si ya firmó presencialmente.
+            </p>
+            <button
+              @click="copyConsentLink(selectedContract)"
+              class="px-3 py-1.5 bg-[#191A1D] hover:bg-[#2A2B2F] text-[#CEA549] rounded text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              <Share2 class="w-3.5 h-3.5" />
+              <span>Copiar mensaje y enlace para WhatsApp</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="p-4 bg-[#FAF9F6] flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[#ECE8E1]">
+          <div class="flex items-center gap-3">
+            <button
+              @click="goToStudent(selectedContract.studentId); showDocViewerModal = false"
+              class="text-xs text-[#8C6B1B] hover:text-[#614910] font-bold underline cursor-pointer"
+            >
+              Ir a la ficha del alumno →
+            </button>
+
+            <button
+              @click="printContract"
+              class="text-xs text-[#191A1D] hover:text-black font-semibold flex items-center gap-1 cursor-pointer"
+              title="Imprimir contrato"
+            >
+              <Printer class="w-3.5 h-3.5 text-[#8C6B1B]" />
+              <span>Imprimir / PDF</span>
+            </button>
+          </div>
 
           <div class="flex items-center gap-2">
             <button
@@ -305,7 +497,7 @@ Los cupos asignados en la agenda son fijos por semana. Las cancelaciones no apla
               class="px-3.5 py-2 rounded text-xs font-bold transition-colors cursor-pointer"
               :class="selectedContract.status === 'Aceptado' ? 'bg-[#FEF7E0] text-[#B06000] hover:bg-[#FEEFC3]' : 'bg-[#E6F4EA] text-[#137333] hover:bg-[#CEEAD6]'"
             >
-              {{ selectedContract.status === 'Aceptado' ? 'Cambiar a Pendiente' : 'Aceptar en Demo' }}
+              {{ selectedContract.status === 'Aceptado' ? 'Cambiar a Pendiente' : 'Marcar como Aceptado' }}
             </button>
             <button
               @click="showDocViewerModal = false"

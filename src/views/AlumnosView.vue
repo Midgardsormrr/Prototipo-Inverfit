@@ -2,8 +2,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGymStore } from '@/stores/gym'
-import { Trash2, RefreshCw, AlertCircle, Database, HardDrive } from 'lucide-vue-next'
+import { Trash2, RefreshCw, AlertCircle, Share2, Check, Activity, Clock, Phone } from 'lucide-vue-next'
 import RegisterStudentModal from '@/components/modals/RegisterStudentModal.vue'
+import type { Student } from '@/types'
 
 const router = useRouter()
 const gymStore = useGymStore()
@@ -12,6 +13,38 @@ const showRegisterModal = ref(false)
 const searchName = ref('')
 const selectedStatus = ref('')
 const selectedFrequency = ref('')
+const copiedLink = ref(false)
+
+function getStudentSchedule(student: Student) {
+  const blocks = gymStore.schedule.filter(b => b.studentIds.includes(student.id))
+  if (blocks.length > 0) {
+    const dayOrder = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
+    return blocks
+      .slice()
+      .sort((a, b) => dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day))
+      .map(b => `${b.day} ${b.startTime}`)
+      .join(', ')
+  }
+  return student.fixedSchedule || 'Por coordinar'
+}
+
+function getStudentEvaluation(studentId: string) {
+  return gymStore.evaluations.find(e => e.studentId === studentId && e.status === 'Registrada')
+}
+
+async function copyPublicLink() {
+  const url = `${window.location.origin}/registro-alumno`
+  try {
+    await navigator.clipboard.writeText(url)
+    copiedLink.value = true
+    gymStore.showToast('Enlace copiado al portapapeles. ¡Pégalo en WhatsApp para que el alumno complete su ficha y firma!', 'success', 'Enlace copiado')
+    setTimeout(() => {
+      copiedLink.value = false
+    }, 3000)
+  } catch {
+    gymStore.showToast(`Enlace: ${url}`, 'info')
+  }
+}
 
 onMounted(async () => {
   await gymStore.loadStudents()
@@ -60,29 +93,22 @@ async function handleDelete(studentId: string, name: string) {
     <!-- Header matching wireframe 03 -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
       <div>
-        <div class="flex items-center gap-2.5">
-          <h1 class="text-[26px] font-bold text-[#191A1D] tracking-tight">Alumnos</h1>
-          <span
-            v-if="gymStore.dataSource === 'api'"
-            class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200"
-            title="Conectado a la API Go y base de datos MongoDB"
-          >
-            <Database class="w-3 h-3 text-emerald-600" />
-            Modo API (MongoDB)
-          </span>
-          <span
-            v-else
-            class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200"
-            title="Operando con almacenamiento simulado en localStorage"
-          >
-            <HardDrive class="w-3 h-3 text-amber-600" />
-            Modo Mock (localStorage)
-          </span>
-        </div>
+        <h1 class="text-[26px] font-bold text-[#191A1D] tracking-tight">Alumnos</h1>
         <p class="text-[14px] text-[#6B6D74] mt-0.5">Consulta alumnos, planes y estado de sus membresías.</p>
       </div>
 
-      <div class="flex items-center gap-2 self-start sm:self-auto">
+      <div class="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+        <button
+          @click="copyPublicLink"
+          title="Copiar enlace de ficha oficial y consentimiento para enviar por WhatsApp"
+          class="h-[40px] px-3.5 bg-white hover:bg-[#FAF9F6] border border-[#DCD8CF] text-[#191A1D] rounded-[6px] text-[13px] font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs hover:border-[#CEA549]"
+        >
+          <Check v-if="copiedLink" class="w-4 h-4 text-[#137333]" />
+          <Share2 v-else class="w-4 h-4 text-[#8C6B1B]" />
+          <span class="hidden sm:inline">{{ copiedLink ? '¡Enlace copiado!' : 'Copiar link auto-ingreso' }}</span>
+          <span class="sm:hidden">{{ copiedLink ? '¡Copiado!' : 'Link WhatsApp' }}</span>
+        </button>
+
         <button
           @click="gymStore.loadStudents()"
           title="Recargar lista de alumnos"
@@ -156,7 +182,7 @@ async function handleDelete(studentId: string, name: string) {
           v-model="selectedFrequency"
           class="h-[40px] px-3.5 bg-[#FAF9F6] border border-[#DCD8CF] rounded-[6px] text-[13px] font-semibold text-[#191A1D] focus:outline-none focus:border-[#CEA549] focus:bg-white focus:ring-1 focus:ring-[#CEA549]/30 transition-all cursor-pointer"
         >
-          <option value="">Todos los planes  ▾</option>
+          <option value="">Todas las frecuencias  ▾</option>
           <option value="1 vez/sem.">1 vez/sem.</option>
           <option value="2 veces/sem.">2 veces/sem.</option>
           <option value="3 veces/sem.">3 veces/sem.</option>
@@ -165,7 +191,7 @@ async function handleDelete(studentId: string, name: string) {
       </div>
     </div>
 
-    <!-- Table matching wireframe 03: Alumno | Plan | Frecuencia | Próximo pago | Estado | Acción -->
+    <!-- Table: Alumno | Plan (Frecuencia) | Horario Asignado | Evaluación | Estado | Acción -->
     <div class="bg-white rounded-[10px] border border-[#E2DFD8] overflow-hidden shadow-2xs">
       <div class="overflow-x-auto">
         <table class="w-full text-left border-collapse min-w-[750px]">
@@ -175,13 +201,13 @@ async function handleDelete(studentId: string, name: string) {
                 Alumno
               </th>
               <th class="py-3 px-6 text-[12px] font-bold text-[#6B6D74] uppercase tracking-wider">
-                Plan
+                Plan (Frecuencia)
               </th>
               <th class="py-3 px-6 text-[12px] font-bold text-[#6B6D74] uppercase tracking-wider">
-                Frecuencia
+                Horario Asignado
               </th>
               <th class="py-3 px-6 text-[12px] font-bold text-[#6B6D74] uppercase tracking-wider">
-                Próximo pago
+                Evaluación
               </th>
               <th class="py-3 px-6 text-[12px] font-bold text-[#6B6D74] uppercase tracking-wider">
                 Estado
@@ -227,25 +253,66 @@ async function handleDelete(studentId: string, name: string) {
                     {{ student.fullName.charAt(0) }}
                   </div>
                   <div>
-                    <span class="group-hover:text-black font-bold text-[#191A1D]">{{ student.fullName }}</span>
-                    <p class="text-[11px] text-[#8E9097] leading-none mt-0.5">{{ student.fixedSchedule }}</p>
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                      <span class="group-hover:text-black font-bold text-[#191A1D]">{{ student.fullName }}</span>
+                      <span
+                        v-if="student.onboarding?.consentAccepted"
+                        title="Ficha completada y consentimiento firmado digitalmente"
+                        class="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-[#E6F4EA] text-[#137333] border border-[#137333]/20"
+                      >
+                        ✓ Firmado
+                      </span>
+                      <span
+                        v-if="student.healthConditions && student.healthConditions !== 'Sin patologías ni lesiones declaradas'"
+                        title="Atención médica: reporta lesiones o enfermedades en su ficha"
+                        class="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-[#FEF7E0] text-[#B06000] border border-[#B06000]/20"
+                      >
+                        PAR-Q+ Alerta
+                      </span>
+                    </div>
+                    <p v-if="student.phone" class="text-[11px] text-[#8E9097] flex items-center gap-1 mt-0.5">
+                      <Phone class="w-3 h-3 text-[#CEA549]" />
+                      {{ student.phone }}
+                    </p>
+                    <p v-else class="text-[11px] text-[#8E9097] mt-0.5">{{ student.email || 'Sin contacto directo' }}</p>
                   </div>
                 </div>
               </td>
 
-              <!-- Plan -->
-              <td class="py-4 px-6 text-[13px] text-[#4A4C52]">
-                {{ student.planName }}
-              </td>
-
-              <!-- Frecuencia -->
-              <td class="py-4 px-6 text-[13px] text-[#4A4C52]">
+              <!-- Plan (Frecuencia) -->
+              <td class="py-4 px-6 text-[13px] font-bold text-[#191A1D]">
                 {{ student.frequency }}
               </td>
 
-              <!-- Próximo pago -->
+              <!-- Horario Asignado -->
               <td class="py-4 px-6 text-[13px] text-[#4A4C52]">
-                {{ student.membershipDueDate }}
+                <div class="flex items-center gap-1.5">
+                  <Clock class="w-3.5 h-3.5 text-[#CEA549] shrink-0" />
+                  <span :class="getStudentSchedule(student) === 'Por coordinar' ? 'text-[#8E9097] italic' : 'font-medium text-[#191A1D]'">
+                    {{ getStudentSchedule(student) }}
+                  </span>
+                </div>
+              </td>
+
+              <!-- Evaluación -->
+              <td class="py-4 px-6 text-[13px]" @click.stop>
+                <router-link
+                  v-if="getStudentEvaluation(student.id)"
+                  :to="'/evaluaciones?studentId=' + student.id"
+                  class="inline-flex items-center gap-1 px-2.5 py-1 rounded-[4px] text-[11px] font-bold bg-[#E6F4EA] text-[#137333] border border-[#137333]/20 hover:bg-[#CEEAD6] transition-colors"
+                  title="Evaluación física registrada. Clic para ver evaluación"
+                >
+                  <Activity class="w-3.5 h-3.5 text-[#137333]" />
+                  Evaluación Lista
+                </router-link>
+                <router-link
+                  v-else
+                  :to="'/evaluaciones?studentId=' + student.id"
+                  class="inline-flex items-center gap-1 px-2.5 py-1 rounded-[4px] text-[11px] font-bold bg-[#FEF7E0] text-[#B06000] border border-[#F0D878] hover:bg-[#FEEFC3] transition-colors"
+                  title="Falta evaluación física. Clic para evaluar alumno"
+                >
+                  Pendiente →
+                </router-link>
               </td>
 
               <!-- Estado -->
@@ -269,7 +336,7 @@ async function handleDelete(studentId: string, name: string) {
                     @click="goToProfile(student.id)"
                     class="text-[#8C6B1B] hover:text-[#614910] hover:underline cursor-pointer flex items-center gap-1 font-bold"
                   >
-                    Ver →
+                    Ficha →
                   </button>
                   <button
                     @click="handleDelete(student.id, student.fullName)"
@@ -284,19 +351,6 @@ async function handleDelete(studentId: string, name: string) {
           </tbody>
         </table>
       </div>
-    </div>
-
-    <!-- Bottom Informational card matching wireframe 03 -->
-    <div class="bg-white rounded-[10px] border border-[#E2DFD8] p-6 shadow-2xs">
-      <h3 class="text-[15px] font-bold text-[#191A1D]">Ficha del alumno</h3>
-      <p class="text-[13px] text-[#6B6D74] mt-1">
-        Desde el perfil se podrán consultar datos, horario fijo, pagos, evaluaciones y contrato.
-      </p>
-      <p class="text-[12px] text-[#8E9097] mt-3">
-        {{ gymStore.dataSource === 'api'
-          ? 'Conectado a la base de datos real MongoDB mediante la API Go REST.'
-          : 'Datos de ejemplo en modo demostración. No utilizar información real de alumnos en el prototipo.' }}
-      </p>
     </div>
 
     <!-- Modals -->

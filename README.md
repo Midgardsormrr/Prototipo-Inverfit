@@ -109,41 +109,94 @@ La aplicación utiliza una capa desacoplada de servicios (`src/services/`):
 Todas las operaciones repercuten de forma inmediata en las 7 pantallas:
 - Al crear o editar un alumno, se actualiza el listado, el selector de la agenda, sus registros de pago, contrato y contadores del dashboard.
 - Al registrar un pago o evaluación, se actualiza el historial en la ficha individual y en las tablas globales.
-- Al recargar la página, todos los datos persisten.
-- Se incluye un botón **"Reiniciar demo"** en el encabezado superior y en la barra lateral para restaurar en cualquier momento los datos iniciales exactos del prototipo Figma.
+- Al recargar la página, todos los datos persisten (tanto en modo MongoDB como en modo LocalStorage).
+- Sesión autenticada persistente para el entrenador Pablo con botón de cierre de sesión seguro en la barra lateral.
 
 ---
 
-## 🛠️ Instalación y Ejecución
+## 🛠️ Instalación y Puesta en Marcha Rápida (Para el Equipo)
 
 ### Prerrequisitos
-- Node.js v18+ (recomendado v20+)
-- npm v9+
+- **Node.js** v18+ (recomendado v20+) y **npm** v9+
+- **Docker & Docker Compose** (para ejecutar la API en Go y MongoDB en contenedores)
+- *Opcional:* Go 1.22+ si se desea ejecutar el backend de manera nativa sin Docker
 
-### Pasos
+---
 
-1. Clonar el repositorio o ingresar a la carpeta:
+### Pasos para Inicializar el Proyecto
+
+#### 1. Clonar el repositorio
 ```bash
 git clone https://github.com/Midgardsormrr/Prototipo-Inverfit.git
 cd Prototipo-Inverfit
 ```
 
-2. Instalar dependencias:
+#### 2. Configurar las Variables de Entorno del Frontend
+Copie la plantilla de configuración `.env.example` como `.env`:
 ```bash
-npm install
+# En Windows (PowerShell):
+copy .env.example .env
+
+# En Linux / macOS / Bash:
+cp .env.example .env
 ```
 
-3. Iniciar el servidor de desarrollo local:
+El archivo `.env` viene preconfigurado para conectarse a la API Dockerizada (`http://localhost:8081/api/v1`):
+```env
+VITE_STUDENTS_DATA_SOURCE=api
+VITE_SCHEDULE_DATA_SOURCE=api
+VITE_PAYMENTS_DATA_SOURCE=api
+VITE_API_BASE_URL=http://localhost:8081/api/v1
+```
+*(Nota: Si desea ejecutar el frontend 100% desconectado o en modo demo offline, simplemente cambie los valores a `mock`).*
+
+#### 3. Levantar la Base de Datos y Backend (Docker Stack)
+El proyecto incluye un entorno Docker multi-contenedor listo para producción/desarrollo (`compose.stack.yaml`):
+
 ```bash
+# 1. Crear el archivo de variables del stack desde la plantilla
+cp .env.stack.example .env.stack   # (o en PowerShell: copy .env.stack.example .env.stack)
+
+# 2. Levantar MongoDB y la API REST en Go
+docker compose -f compose.stack.yaml --env-file .env.stack up -d --build
+
+# 3. Verificar que los contenedores estén saludables (healthy)
+docker compose -f compose.stack.yaml --env-file .env.stack ps
+```
+- La API de Go quedará disponible en: `http://localhost:8081/api/v1`
+- Verificación de salud: `http://localhost:8081/health/ready`
+
+#### 4. Instalar Dependencias del Frontend y Correr en Desarrollo
+```bash
+# Instalar paquetes npm
+npm install
+
+# Iniciar servidor Vite
 npm run dev
 ```
-La aplicación quedará disponible en `http://localhost:5173/`.
+La aplicación web quedará disponible en: **`http://localhost:5173/`**
+
+---
+
+## 🔐 Credenciales de Acceso (Coach Pablo)
+
+Al ingresar a `http://localhost:5173/login`, el sistema presenta una pantalla de inicio de sesión con branding oficial INVERFIT:
+
+| Campo | Valor |
+|---|---|
+| **Correo electrónico** | `pablo@inverfit.cl` |
+| **Contraseña** | `inverfit2026` |
+| **Acceso Rápido** | Se incluye un botón de 1 clic *"Pablo (Coach & Admin)"* para autocompletar credenciales |
+
+### 📝 Portal Público de Onboarding y Firma Digital
+Cualquier alumno nuevo puede completar su ficha médica y firmar su consentimiento informado en pantalla táctil/mouse accediendo a la ruta pública:
+- **`http://localhost:5173/registro-alumno`** (No requiere login de entrenador).
 
 ---
 
 ## 📦 Compilación para Producción
 
-Para compilar el proyecto como una aplicación web estática optimizada para hosting (Netlify, Vercel, Firebase Hosting, S3, etc.):
+Para compilar el proyecto como una aplicación web estática optimizada para hosting (Cloudflare Pages, Netlify, Vercel, S3):
 
 ```bash
 npm run build
@@ -158,49 +211,16 @@ Los artefactos listos para despliegue se generarán en el directorio `dist/`.
 
 ---
 
-## 🔌 Backend Go + Gin + MongoDB y Despliegue Dockerizado
+## 🔌 Arquitectura del Backend Go + MongoDB
 
-La plataforma cuenta con un backend modular implementado en **Go + Gin** conectado a **MongoDB 7.0**, con soporte completo para alternar dinámicamente entre modo simulado (`mock`) y modo real (`api`):
-
-- **Módulos con persistencia real:** Alumnos (`/api/v1/students`), Agenda Semanal y Disponibilidad (`/api/v1/schedule`), Pagos y Finanzas (`/api/v1/payments`).
-- **Modo Dual configurable:** Mediante variables de entorno en el frontend (`.env`):
-  - `VITE_STUDENTS_DATA_SOURCE=api` | `mock`
-  - `VITE_SCHEDULE_DATA_SOURCE=api` | `mock`
-  - `VITE_PAYMENTS_DATA_SOURCE=api` | `mock`
-  - `VITE_API_BASE_URL=http://localhost:8080/api/v1`
-
-### Modos de Ejecución del Backend
-
-1. **Desarrollo Local (Backend en Windows + MongoDB en Docker):**
-   ```bash
-   # Iniciar MongoDB en segundo plano
-   cd backend
-   docker compose up -d
-
-   # Iniciar la API REST en Go
-   go run ./cmd/api
-   ```
-
-2. **Stack Completo Dockerizado (API + MongoDB en contenedores independientes):**
-   ```bash
-   # Copiar archivo de entorno
-   cp .env.stack.example .env.stack
-
-   # Levantar el stack completo (API en 127.0.0.1:8080 y MongoDB interno)
-   docker compose -f compose.stack.yaml --env-file .env.stack up -d --build
-
-   # Comprobar salud del stack
-   docker compose -f compose.stack.yaml --env-file .env.stack ps
-   ```
-
-Para más detalles sobre la arquitectura de la API, endpoints, seguridad y procedimientos de respaldo, consulte [`backend/README.md`](file:///c:/Users/diego/OneDrive/Documentos/GitHub/Prototipo-Inverfit/backend/README.md).
-
-
-
+La plataforma cuenta con un backend modular implementado en **Go + Gin** conectado a **MongoDB 7.0**:
+- **Módulos:** Alumnos (`/api/v1/students`), Agenda y Disponibilidad (`/api/v1/schedule`), Pagos y Finanzas (`/api/v1/payments`).
+- **Control de concurrencia y cupos:** Validación estricta del límite oficial de **3 alumnos por bloque de 75 minutos**.
+- Para más detalles sobre la arquitectura interna, endpoints y modelos, consulte [`backend/README.md`](backend/README.md).
 
 ---
 
-## ⚖️ Nota de Demostración y Privacidad
-
-- Todos los datos personales son ficticios (Alumno de ejemplo 01 a 06).
-- Las funciones de pago, emisión de boletas y aceptación contractual son simulaciones visuales con fines de validación de flujos. No constituyen transacciones financieras reales ni firma electrónica legal conforme a la Ley 19.799.
+## ⚖️ Versión y Respaldo Operativo
+- **Versión de la plataforma:** `INVERFIT ❯❯ v1.1`
+- **Ciclo de Cobranza:** Oficial del 1 al 5 de cada mes mediante pasarela e integraciones SumUp.
+- **Consentimientos:** Respaldo digital de firmas conforme al reglamento interno oficial de 4 cláusulas.

@@ -37,6 +37,9 @@ export class PaymentApiService implements IPaymentService {
       dueDate: dto.dueDate,
       paymentDate: dto.paymentDate,
       paymentMethod: dto.paymentMethod,
+      transactionReference: dto.transactionReference,
+      voucherUrl: dto.voucherUrl,
+      voucherFileName: dto.voucherFileName,
       notes: dto.notes
     })
   }

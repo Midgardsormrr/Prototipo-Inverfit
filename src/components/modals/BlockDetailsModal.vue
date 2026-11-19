@@ -179,8 +179,11 @@ function goToStudent(studentId: string) {
             <span v-if="occurrence?.isException" class="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 text-[11px] font-bold rounded">
               Excepción de esta semana
             </span>
+            <span v-if="currentBlock.type === 'Evaluación' || occurrence?.type === 'Evaluación'" class="px-2 py-0.5 bg-[#CEA549]/15 text-[#8C6B1B] border border-[#CEA549]/30 text-[11px] font-bold rounded">
+              Evaluación
+            </span>
             <h2 class="text-lg font-bold text-[#191A1D]">
-              Sesión de Entrenamiento
+              {{ (currentBlock.type === 'Evaluación' || occurrence?.type === 'Evaluación') ? 'Bloque de Evaluación' : 'Sesión de Entrenamiento' }}
             </h2>
           </div>
           <p class="text-xs text-[#6B6D74] mt-1 flex items-center gap-2">
@@ -204,17 +207,33 @@ function goToStudent(studentId: string) {
         <!-- Assigned Students List -->
         <div>
           <div class="flex items-center justify-between mb-2">
-            <h3 class="text-xs font-bold text-[#6B6D74] uppercase tracking-wider flex items-center gap-1.5">
-              <Users class="w-4 h-4 text-[#CEA549]" />
-              Alumnos Asignados ({{ assignedStudents.length }})
-            </h3>
+            <div class="flex items-center gap-2">
+              <h3 class="text-xs font-bold text-[#6B6D74] uppercase tracking-wider flex items-center gap-1.5">
+                <Users class="w-4 h-4 text-[#CEA549]" />
+                Alumnos Asignados
+              </h3>
+              <span
+                class="px-2 py-0.5 rounded-full text-[11px] font-bold"
+                :class="assignedStudents.length >= 3
+                  ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                  : 'bg-emerald-50 text-emerald-800 border border-emerald-200'"
+              >
+                {{ assignedStudents.length }} / 3 cupos
+                <span v-if="assignedStudents.length >= 3">· Completo</span>
+              </span>
+            </div>
+
             <button
+              v-if="assignedStudents.length < 3"
               @click="emit('add-student', currentBlock)"
               class="text-xs text-[#8C6B1B] hover:text-[#614910] font-bold flex items-center gap-1 hover:underline cursor-pointer"
             >
               <UserPlus class="w-3.5 h-3.5" />
-              + Asignar otro alumno
+              + Asignar alumno
             </button>
+            <span v-else class="text-[11px] text-[#8E9097] font-medium">
+              Cupo máximo alcanzado
+            </span>
           </div>
 
           <div v-if="assignedStudents.length === 0" class="p-6 text-center border border-dashed border-[#DCD8CF] rounded-lg text-sm text-[#6B6D74] bg-[#FAF9F6]">

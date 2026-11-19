@@ -56,7 +56,9 @@ export class PaymentMockService implements IPaymentService {
         amount: dto.amount !== undefined ? dto.amount : list[pendingIdx].amount,
         paymentDate: dateFormatted,
         paymentMethod: dto.paymentMethod,
-        transactionReference: `BOL-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${Date.now().toString().slice(-4)}`,
+        transactionReference: dto.transactionReference || `BOL-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${Date.now().toString().slice(-4)}`,
+        voucherUrl: dto.voucherUrl || list[pendingIdx].voucherUrl,
+        voucherFileName: dto.voucherFileName || list[pendingIdx].voucherFileName,
         notes: dto.notes || 'Pago confirmado y registrado por el entrenador.'
       }
       list[pendingIdx] = updatedPayment
@@ -67,12 +69,14 @@ export class PaymentMockService implements IPaymentService {
         studentName: student.fullName,
         planName: student.planName,
         frequency: student.frequency,
-        dueDate: dto.dueDate || 'Por definir',
+        dueDate: dto.dueDate || '1 al 5 de cada mes',
         amount: dto.amount ?? null,
         status: 'Pagado',
         paymentDate: dateFormatted,
         paymentMethod: dto.paymentMethod,
-        transactionReference: `BOL-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${Date.now().toString().slice(-4)}`,
+        transactionReference: dto.transactionReference || `BOL-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${Date.now().toString().slice(-4)}`,
+        voucherUrl: dto.voucherUrl,
+        voucherFileName: dto.voucherFileName,
         reminderSentCount: 0,
         lastReminderAt: null,
         receiptSent: false,
@@ -149,8 +153,9 @@ export class PaymentMockService implements IPaymentService {
       throw new Error('Alumno no encontrado')
     }
 
-    const token = Math.random().toString(36).substring(2, 10).toUpperCase()
-    const link = `https://demo.inverfit.invalid/checkout/${token}`
+    const token = Math.random().toString(36).substring(2, 8).toUpperCase()
+    const studentSlug = student.fullName.toLowerCase().replace(/[^a-z0-9]/g, '')
+    const link = `https://link.sumup.com/pay/inverfit-${studentSlug || token}`
 
     const list = storage.getPayments()
     let pIdx = -1
@@ -166,6 +171,7 @@ export class PaymentMockService implements IPaymentService {
     if (pIdx !== -1) {
       list[pIdx] = {
         ...list[pIdx],
+        paymentMethod: 'SumUp (Link de pago)',
         reminderSentCount: (list[pIdx].reminderSentCount || 0) + 1,
         lastReminderAt: timestamp
       }
@@ -175,7 +181,7 @@ export class PaymentMockService implements IPaymentService {
     return {
       success: true,
       link,
-      message: `Enlace de pago simulado generado exitosamente para ${student.fullName}.`
+      message: `Enlace de pago SumUp generado exitosamente para ${student.fullName}.`
     }
   }
 
@@ -196,7 +202,7 @@ export class PaymentMockService implements IPaymentService {
 
     return {
       success: true,
-      message: `Recordatorio simulado enviado exitosamente a ${list[idx].studentName}.`
+      message: `Aviso de cobro registrado para ${list[idx].studentName}.`
     }
   }
 
@@ -217,7 +223,7 @@ export class PaymentMockService implements IPaymentService {
 
     return {
       success: true,
-      message: `Comprobante de pago simulado enviado a ${list[idx].studentName}.`
+      message: `Comprobante de pago emitido para ${list[idx].studentName}.`
     }
   }
 

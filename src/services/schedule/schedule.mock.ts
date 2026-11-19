@@ -184,6 +184,12 @@ export class ScheduleMockService {
       targetBlock = list.find(b => b.day === dto.day && b.startTime === dto.startTime && b.endTime === endTime)
     }
 
+    if (dto.studentIds.length > 3) {
+      return { success: false, message: 'El límite máximo por bloque en INVERFIT es de 3 alumnos.' }
+    }
+
+    const resolvedType = dto.type || (dto.day === 'Sáb' ? 'Evaluación' : (dto.studentIds.length > 1 ? 'Sesión grupal' : 'Individual'))
+
     if (targetBlock) {
       if (dto.blockId) {
         targetBlock.studentIds = [...dto.studentIds]
@@ -194,11 +200,15 @@ export class ScheduleMockService {
           }
         })
       }
+      if (targetBlock.studentIds.length > 3) {
+        return { success: false, message: 'El límite máximo por bloque en INVERFIT es de 3 alumnos.' }
+      }
       targetBlock.day = dto.day
       targetBlock.startTime = dto.startTime
       targetBlock.endTime = endTime
       targetBlock.durationMinutes = durationMinutes
-      targetBlock.type = targetBlock.studentIds.length > 1 ? 'Sesión grupal' : 'Individual'
+      targetBlock.type = resolvedType
+      targetBlock.maxCapacity = 3
       if (dto.notes) targetBlock.notes = dto.notes
     } else {
       targetBlock = {
@@ -207,8 +217,9 @@ export class ScheduleMockService {
         startTime: dto.startTime,
         endTime: endTime,
         durationMinutes: durationMinutes,
-        type: dto.studentIds.length > 1 ? 'Sesión grupal' : 'Individual',
+        type: resolvedType,
         studentIds: [...dto.studentIds],
+        maxCapacity: 3,
         isRecurring: dto.isRecurring !== false,
         notes: dto.notes || `Sesión de ${dto.day} ${dto.startTime} a ${endTime}.`
       }

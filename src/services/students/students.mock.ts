@@ -20,15 +20,16 @@ export class StudentMockService {
       fullName: dto.fullName.trim(),
       email: dto.email?.trim() || `${dto.fullName.toLowerCase().replace(/\s+/g, '')}@ejemplo.com`,
       phone: dto.phone?.trim() || '+56 9 Por definir',
-      planName: dto.planName || 'Plan estándar',
+      planName: dto.planName || 'Membresía Mensual',
       frequency: dto.frequency,
       membershipStatus: dto.membershipStatus || 'Activo',
       fixedSchedule: dto.fixedSchedule || 'Días y horas por confirmar',
       membershipStartDate: dto.membershipStartDate || new Date().toISOString().split('T')[0],
-      membershipDueDate: dto.membershipDueDate || 'Por definir',
+      membershipDueDate: dto.membershipDueDate || '1 al 5 de cada mes',
       notes: dto.notes || '',
-      healthConditions: dto.healthConditions || 'Sin observaciones de salud registradas',
+      healthConditions: dto.healthConditions || (dto.onboarding?.chronicDiseases ? `Crónicas: ${dto.onboarding.chronicDiseases}` : 'Sin observaciones de salud registradas'),
       emergencyContact: dto.emergencyContact || 'Por registrar',
+      onboarding: dto.onboarding,
       createdAt: new Date().toISOString().split('T')[0]
     }
 
@@ -43,11 +44,11 @@ export class StudentMockService {
       studentName: newStudent.fullName,
       planName: newStudent.planName,
       frequency: newStudent.frequency,
-      dueDate: 'Por definir',
+      dueDate: '1 al 5 de cada mes',
       amount: null,
       status: 'Pendiente',
       paymentDate: null,
-      paymentMethod: 'Por definir',
+      paymentMethod: 'SumUp (Link de pago)',
       reminderSentCount: 0,
       lastReminderAt: null,
       receiptSent: false,
@@ -71,7 +72,7 @@ export class StudentMockService {
         { name: 'Movilidad funcional', value: 'Por evaluar' },
         { name: 'Fuerza base', value: 'Por evaluar' }
       ],
-      observations: 'Evaluación inicial programada al ingreso.',
+      observations: dto.onboarding?.primaryGoal ? `Objetivo: ${dto.onboarding.primaryGoal}. Evaluación inicial programada.` : 'Evaluación inicial programada al ingreso.',
       conductedBy: 'Pablo',
       createdAt: new Date().toISOString().split('T')[0]
     }
@@ -79,16 +80,17 @@ export class StudentMockService {
 
     // Create synchronized contract consent record for mock demonstration
     const contracts = storage.getContracts()
+    const isConsentGiven = !!dto.onboarding?.consentAccepted
     const newContract: ContractConsent = {
       id: `cnt-${Date.now().toString().slice(-6)}`,
       studentId: newStudent.id,
       studentName: newStudent.fullName,
       documentType: 'Términos y condiciones',
-      status: 'Pendiente',
-      date: 'Por registrar',
+      status: isConsentGiven ? 'Aceptado' : 'Pendiente',
+      date: isConsentGiven ? (dto.onboarding?.consentTimestamp?.split('T')[0] || new Date().toISOString().split('T')[0]) : 'Por registrar',
       termsVersion: 'v1.0 (2026)',
-      signedCopyAvailable: false,
-      notes: 'Pendiente de aceptación de términos del servicio.'
+      signedCopyAvailable: isConsentGiven,
+      notes: isConsentGiven ? 'Consentimiento informado y declaración jurada firmada digitalmente.' : 'Pendiente de aceptación de términos del servicio.'
     }
     storage.setContracts([newContract, ...contracts])
 
