@@ -26,9 +26,17 @@ func Load() (*Config, error) {
 	_ = loadEnvFile(".env")
 	_ = loadEnvFile("backend/.env")
 
+	httpPort := os.Getenv("HTTP_PORT")
+	if httpPort == "" {
+		httpPort = os.Getenv("PORT")
+	}
+	if httpPort == "" {
+		httpPort = "8080"
+	}
+
 	cfg := &Config{
 		AppEnv:          getEnvOrDefault("APP_ENV", "development"),
-		HTTPPort:        getEnvOrDefault("HTTP_PORT", "8080"),
+		HTTPPort:        httpPort,
 		MongoDBURI:      os.Getenv("MONGODB_URI"),
 		MongoDBDatabase: getEnvOrDefault("MONGODB_DATABASE", "inverfit_dev"),
 		LogLevel:        strings.ToLower(getEnvOrDefault("LOG_LEVEL", "info")),

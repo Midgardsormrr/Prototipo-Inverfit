@@ -8,6 +8,7 @@ import (
 func clearEnv() {
 	_ = os.Unsetenv("APP_ENV")
 	_ = os.Unsetenv("HTTP_PORT")
+	_ = os.Unsetenv("PORT")
 	_ = os.Unsetenv("MONGODB_URI")
 	_ = os.Unsetenv("MONGODB_DATABASE")
 	_ = os.Unsetenv("CORS_ALLOWED_ORIGINS")
