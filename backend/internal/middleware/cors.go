@@ -25,10 +25,19 @@ func CORS(allowedOrigins []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.Request.Header.Get("Origin")
 
-		if origin != "" && (allowAll || allowedMap[origin]) {
+		isAllowed := false
+		if origin != "" {
+			if allowAll || allowedMap[origin] {
+				isAllowed = true
+			} else if strings.Contains(origin, "vercel.app") || strings.Contains(origin, "onrender.com") {
+				isAllowed = true
+			}
+		}
+
+		if isAllowed {
 			c.Header("Access-Control-Allow-Origin", origin)
 			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-			c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization")
+			c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization, X-Requested-With")
 			c.Header("Access-Control-Max-Age", "86400")
 			c.Header("Vary", "Origin")
 		}
