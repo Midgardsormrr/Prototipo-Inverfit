@@ -30,10 +30,10 @@ export class HttpClient {
     let finalBaseUrl = baseUrl ? baseUrl.trim() : ''
 
     // Si estamos corriendo en un entorno en la nube (ej. Vercel) y no en localhost,
-    // garantizamos que las peticiones apunten al backend desplegado en Render (evita fallo de localhost)
+    // usamos el proxy /api/v1 configurado en vercel.json que reenvía a Render sin problemas de CORS
     if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      if (!finalBaseUrl || finalBaseUrl.includes('localhost') || finalBaseUrl.includes('127.0.0.1')) {
-        finalBaseUrl = 'https://inverfit-api.onrender.com/api/v1'
+      if (!finalBaseUrl || finalBaseUrl.includes('localhost') || finalBaseUrl.includes('127.0.0.1') || finalBaseUrl.includes('inverfit-api.onrender.com')) {
+        finalBaseUrl = '/api/v1'
       }
     } else if (!finalBaseUrl) {
       finalBaseUrl = 'http://localhost:8081/api/v1'
