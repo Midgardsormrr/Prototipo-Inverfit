@@ -54,7 +54,7 @@ export const initialCoachAvailability: DayAvailability[] = [
     day: 'Sáb',
     enabled: true,
     intervals: [
-      { id: 'int-sab-eval', startTime: '06:30', endTime: '13:00' }
+      { id: 'int-sab-eval', startTime: '06:30', endTime: '22:00' }
     ]
   },
   {

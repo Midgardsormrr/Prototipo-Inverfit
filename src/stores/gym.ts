@@ -132,7 +132,8 @@ export const useGymStore = defineStore('gym', () => {
         scheduleService.getAll(),
         scheduleService.getExceptions(from, to)
       ])
-      availability.value = Array.isArray(avail) ? avail : []
+      const hasEnabledDays = Array.isArray(avail) && avail.some(a => a.enabled && a.intervals && a.intervals.length > 0)
+      availability.value = hasEnabledDays ? avail : storage.getAvailability()
       schedule.value = Array.isArray(blocks) ? blocks : []
       exceptions.value = Array.isArray(excs) ? excs : []
       return { availability: availability.value, schedule: schedule.value, exceptions: exceptions.value }

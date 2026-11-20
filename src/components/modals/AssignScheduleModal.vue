@@ -155,6 +155,9 @@ const validationCheck = computed(() => {
 const dayAvailabilityInfo = computed(() => {
   const avail = gymStore.availability.find(a => a.day === selectedDay.value)
   if (!avail || !avail.enabled || !avail.intervals || avail.intervals.length === 0) {
+    if (selectedDay.value !== 'Dom') {
+      return '06:30 a 22:00 (Disponibilidad oficial INVERFIT)'
+    }
     return 'Sin disponibilidad configurada para este día'
   }
   return (avail.intervals || []).map(i => `${i.startTime} a ${i.endTime}`).join(' y ')

@@ -66,10 +66,47 @@ func NewService(repo Repository, studentReader StudentReader) Service {
 // AVAILABILITY METHODS
 // ==========================================
 
+// DefaultAvailabilityForDay returns the official default operating availability for Coach Pablo.
+// Monday to Saturday: 06:30 to 22:00.
+// Sunday: Closed (Enabled: false).
+func DefaultAvailabilityForDay(day DayOfWeek) DayAvailability {
+	if day == DayDom {
+		return DayAvailability{
+			Day:       day,
+			Enabled:   false,
+			Intervals: []AvailabilityInterval{},
+			Timezone:  DefaultTimezone,
+		}
+	}
+	return DayAvailability{
+		Day:     day,
+		Enabled: true,
+		Intervals: []AvailabilityInterval{
+			{
+				ID:        fmt.Sprintf("int-%s-default", strings.ToLower(string(day))),
+				StartTime: OperatingStart,
+				EndTime:   OperatingEnd,
+			},
+		},
+		Timezone: DefaultTimezone,
+	}
+}
+
 func (s *service) GetAvailability(ctx context.Context) ([]DayAvailabilityResponse, error) {
 	stored, err := s.repo.GetAllAvailability(ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	// Auto-seed default availability to MongoDB if database is empty
+	if len(stored) == 0 {
+		for _, day := range CanonicalDays {
+			def := DefaultAvailabilityForDay(day)
+			_ = s.repo.UpsertAvailability(ctx, &def)
+		}
+		if reloaded, rerr := s.repo.GetAllAvailability(ctx); rerr == nil && len(reloaded) > 0 {
+			stored = reloaded
+		}
 	}
 
 	storedMap := make(map[DayOfWeek]DayAvailability)
@@ -92,11 +129,12 @@ func (s *service) GetAvailability(ctx context.Context) ([]DayAvailabilityRespons
 				Timezone:  a.Timezone,
 			}
 		} else {
+			def := DefaultAvailabilityForDay(day)
 			res[i] = DayAvailabilityResponse{
-				Day:       day,
-				Enabled:   false,
-				Intervals: make([]AvailabilityInterval, 0),
-				Timezone:  DefaultTimezone,
+				Day:       def.Day,
+				Enabled:   def.Enabled,
+				Intervals: def.Intervals,
+				Timezone:  def.Timezone,
 			}
 		}
 	}
@@ -115,11 +153,12 @@ func (s *service) GetAvailabilityByDay(ctx context.Context, dayStr string) (*Day
 		return nil, err
 	}
 	if stored == nil {
+		def := DefaultAvailabilityForDay(day)
 		return &DayAvailabilityResponse{
-			Day:       day,
-			Enabled:   false,
-			Intervals: make([]AvailabilityInterval, 0),
-			Timezone:  DefaultTimezone,
+			Day:       def.Day,
+			Enabled:   def.Enabled,
+			Intervals: def.Intervals,
+			Timezone:  def.Timezone,
 		}, nil
 	}
 
@@ -327,7 +366,11 @@ func (s *service) CreateSession(ctx context.Context, req CreateSessionRequest) (
 	if err != nil {
 		return nil, err
 	}
-	if dayAvail == nil || !dayAvail.Enabled || len(dayAvail.Intervals) == 0 {
+	if dayAvail == nil {
+		def := DefaultAvailabilityForDay(day)
+		dayAvail = &def
+	}
+	if !dayAvail.Enabled || len(dayAvail.Intervals) == 0 {
 		return nil, fmt.Errorf("%w para el día %s", ErrSessionOutsideAvailability, day)
 	}
 	fitsInAvailability := false
@@ -502,7 +545,11 @@ func (s *service) UpdateSession(ctx context.Context, idStr string, req UpdateSes
 	if err != nil {
 		return nil, err
 	}
-	if dayAvail == nil || !dayAvail.Enabled || len(dayAvail.Intervals) == 0 {
+	if dayAvail == nil {
+		def := DefaultAvailabilityForDay(newDay)
+		dayAvail = &def
+	}
+	if !dayAvail.Enabled || len(dayAvail.Intervals) == 0 {
 		return nil, fmt.Errorf("%w para el día %s", ErrSessionOutsideAvailability, newDay)
 	}
 	fits := false
@@ -937,7 +984,11 @@ func (s *service) CreateException(ctx context.Context, sessionIDStr string, req 
 		if err != nil {
 			return nil, err
 		}
-		if destAvail == nil || !destAvail.Enabled || len(destAvail.Intervals) == 0 {
+		if destAvail == nil {
+			def := DefaultAvailabilityForDay(*newDay)
+			destAvail = &def
+		}
+		if !destAvail.Enabled || len(destAvail.Intervals) == 0 {
 			return nil, fmt.Errorf("%w para el día de destino %s", ErrSessionOutsideAvailability, *newDay)
 		}
 		fits := false
